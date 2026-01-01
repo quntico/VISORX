@@ -1,0 +1,129 @@
+
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet';
+import { motion } from 'framer-motion';
+import { Box as Cube, Shield, Zap, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
+
+function Login() {
+  const { signInWithGoogle, user, loading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Check for error in URL hash (from OAuth redirect)
+    const hash = window.location.hash;
+    if (hash && hash.includes('error_description')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const errorDescription = params.get('error_description');
+      const errorCode = params.get('error_code');
+      
+      console.error('[AuthDebug] URL Hash Error:', errorDescription, errorCode);
+      
+      if (errorDescription) {
+        toast({
+          title: "Authentication Error",
+          description: errorDescription.replace(/\+/g, ' '),
+          variant: "destructive"
+        });
+      }
+    }
+
+    if (user && !loading) {
+      console.log('[AuthDebug] Login page detected user, redirecting to dashboard');
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate, toast]);
+
+  const handleLoginClick = () => {
+    console.log('[AuthDebug] Login button clicked');
+    signInWithGoogle();
+  };
+
+  return (
+    <>
+      <Helmet>
+        <title>Login - VISOR-X</title>
+        <meta name="description" content="Sign in to VISOR-X" />
+      </Helmet>
+      
+      <div className="min-h-screen bg-[#0B0F14] flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Background Grid */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="h-full w-full" style={{
+            backgroundImage: 'linear-gradient(#29B6F6 1px, transparent 1px), linear-gradient(90deg, #29B6F6 1px, transparent 1px)',
+            backgroundSize: '50px 50px'
+          }}></div>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="w-full max-w-md relative z-10"
+        >
+          <div className="bg-[#151B23] border border-[#29B6F6]/20 rounded-lg p-8 shadow-2xl">
+            {/* Logo */}
+            <div className="flex items-center justify-center mb-8">
+              <div className="relative">
+                <Cube className="h-12 w-12 text-[#29B6F6]" strokeWidth={1.5} />
+                <div className="absolute inset-0 bg-[#29B6F6] blur-xl opacity-30"></div>
+              </div>
+              <div className="ml-3">
+                <h1 className="text-2xl font-bold text-white">VISOR-X</h1>
+                <p className="text-xs text-[#29B6F6]">v1.0</p>
+              </div>
+            </div>
+
+            {/* Features */}
+            <div className="grid grid-cols-3 gap-3 mb-8">
+              <div className="bg-[#0B0F14] border border-[#29B6F6]/10 rounded p-3 text-center">
+                <Shield className="h-5 w-5 text-[#29B6F6] mx-auto mb-1" />
+                <p className="text-xs text-gray-400">Secure</p>
+              </div>
+              <div className="bg-[#0B0F14] border border-[#29B6F6]/10 rounded p-3 text-center">
+                <Cube className="h-5 w-5 text-[#29B6F6] mx-auto mb-1" />
+                <p className="text-xs text-gray-400">AR Ready</p>
+              </div>
+              <div className="bg-[#0B0F14] border border-[#29B6F6]/10 rounded p-3 text-center">
+                <Zap className="h-5 w-5 text-[#29B6F6] mx-auto mb-1" />
+                <p className="text-xs text-gray-400">Fast</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="text-center">
+                <h2 className="text-xl font-semibold text-white mb-2">Welcome Back</h2>
+                <p className="text-sm text-gray-400">Sign in to manage your projects</p>
+              </div>
+
+              <Button
+                onClick={handleLoginClick}
+                className="w-full bg-white hover:bg-gray-100 text-gray-900 font-medium h-12 flex items-center justify-center gap-3 transition-all"
+              >
+                <img 
+                  src="https://www.google.com/favicon.ico" 
+                  alt="Google" 
+                  className="w-5 h-5"
+                />
+                Sign in with Google
+              </Button>
+
+              <div className="bg-[#29B6F6]/10 border border-[#29B6F6]/20 rounded p-3 flex items-start gap-3">
+                <Info className="h-5 w-5 text-[#29B6F6] shrink-0 mt-0.5" />
+                <p className="text-xs text-[#29B6F6] leading-relaxed">
+                  Admin access is granted automatically for authorized emails.
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </>
+  );
+}
+
+export default Login;
