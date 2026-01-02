@@ -19,11 +19,12 @@ import {
 
 // THREE JS IMPORTS
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'; // Added for saved files
-import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader'; // Added for .dae support
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter'; // For iOS AR
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
 import { TGALoader } from 'three/examples/jsm/loaders/TGALoader';
 import JSZip from 'jszip'; // For ZIP support
@@ -121,16 +122,31 @@ function Converter() {
     const handleOpenAR = async () => {
         if (!modelObject) return;
         setLoading(true);
+        setIsGeneratingAR(true);
         try {
-            const blob = await generateGLB();
-            const url = URL.createObjectURL(blob);
-            setArBlobUrl(url);
+            // 1. Generate GLB (Android/WebXR)
+            const glbBlob = await generateGLB();
+            const glbUrl = URL.createObjectURL(glbBlob);
+            setArBlobUrl(glbUrl);
+
+            // 2. Generate USDZ (iOS Quick Look)
+            const usdzBlob = await new Promise((resolve, reject) => {
+                const exporter = new USDZExporter();
+                exporter.parse(modelObject, (result) => {
+                    const blob = new Blob([result], { type: 'model/vnd.usdz+zip' });
+                    resolve(blob);
+                }, (err) => reject(err));
+            });
+            const usdzUrl = URL.createObjectURL(usdzBlob);
+            setIosSrc(usdzUrl);
+
             setShowAR(true);
         } catch (error) {
             console.error("AR Error:", error);
             toast({ title: "Error AR", description: "No se pudo preparar el modelo para AR.", variant: "destructive" });
         } finally {
             setLoading(false);
+            setIsGeneratingAR(false);
         }
     };
 
@@ -236,6 +252,10 @@ function Converter() {
     const [rotationAxis, setRotationAxis] = useState('y');
     const autoRotateRef = useRef(false);
     const rotationAxisRef = useRef('y');
+
+    // AR STATE
+    const [iosSrc, setIosSrc] = useState(null);
+    const [isGeneratingAR, setIsGeneratingAR] = useState(false);
 
     // Sync refs for animation loop
     useEffect(() => {
@@ -2004,7 +2024,7 @@ function Converter() {
                                 shadow-intensity="1"
                                 ar-scale="auto"
                                 ar-placement="floor"
-                                ios-src={arBlobUrl} // Try passing same blob for iOS (sometimes works if GLB is compliant)
+                                ios-src={iosSrc}
                                 quick-look-browsers="safari chrome"
                                 style={{ width: '100%', height: '100%' }}
                             >
@@ -2012,7 +2032,8 @@ function Converter() {
                                     slot="ar-button"
                                     className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-[#29B6F6] text-black hover:bg-[#29B6F6]/90 shadow-xl rounded-full px-8 py-6 text-lg font-bold animate-pulse z-50 pointer-events-auto"
                                 >
-                                    <Camera className="h-6 w-6 mr-2" /> Activar Cámara
+                                    <Camera className="h-6 w-6 mr-2" />
+                                    {isGeneratingAR ? "Procesando iOS..." : "Activar Cámara"}
                                 </Button>
                             </model-viewer>
                         )}
