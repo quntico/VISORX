@@ -2055,14 +2055,22 @@ function Converter() {
                 onLoadModel={handleLoadModel}
                 onDeleteModel={handleDeleteModel}
                 loading={loading}
+                onRefresh={loadAllData}
             />
         </>
     );
 }
 
 // Mobile Library Overlay Component
-function MobileLibraryOverlay({ open, onClose, models, onLoadModel, onDeleteModel, loading }) {
+function MobileLibraryOverlay({ open, onClose, models, onLoadModel, onDeleteModel, loading, onRefresh }) {
     if (!open) return null;
+
+    // Auto-refresh when opened
+    useEffect(() => {
+        if (open && onRefresh) {
+            onRefresh();
+        }
+    }, [open]);
 
     return (
         <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex flex-col animate-in fade-in duration-200">
@@ -2072,9 +2080,20 @@ function MobileLibraryOverlay({ open, onClose, models, onLoadModel, onDeleteMode
                     <BookOpen className="h-5 w-5 text-[#29B6F6]" />
                     Tu Librería
                 </h3>
-                <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full h-8 w-8 bg-white/10 text-white">
-                    <X className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onRefresh}
+                        className="rounded-full h-8 w-8 bg-white/10 text-white active:bg-[#29B6F6] active:text-black"
+                        title="Actualizar"
+                    >
+                        <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full h-8 w-8 bg-white/10 text-white">
+                        <X className="h-5 w-5" />
+                    </Button>
+                </div>
             </div>
 
             {/* List */}
@@ -2082,7 +2101,10 @@ function MobileLibraryOverlay({ open, onClose, models, onLoadModel, onDeleteMode
                 {models.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-60">
                         <BoxIcon className="h-12 w-12 mb-2" />
-                        <p>No hay modelos guardados</p>
+                        <p className="mb-4">No se encontraron modelos</p>
+                        <Button onClick={onRefresh} variant="outline" className="border-white/20 text-white">
+                            <RotateCw className="mr-2 h-4 w-4" /> Forzar Recarga
+                        </Button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 gap-3">
