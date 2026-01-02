@@ -1810,18 +1810,34 @@ function Converter() {
                         </div>
                     )}
 
-                    {/* Controls Toggle (Menu) */}
+                    <div className="flex flex-col items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-10 w-10 rounded-full bg-white/5 ${showControls ? 'text-[#29B6F6] bg-[#29B6F6]/10' : 'text-white'}`}
+                            onClick={() => setShowControls(!showControls)}
+                        >
+                            <Settings className="h-5 w-5" />
+                        </Button>
+                        <span className="text-[9px] text-gray-400">Ajustes</span>
+                    </div>
+                    )}
+
+                    {/* Library Toggle (Replaces simple settings or adds to it) -> User requested Library specifically */}
                     {activeTab === '3d' && (
                         <div className="flex flex-col items-center gap-1">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className={`h-10 w-10 rounded-full bg-white/5 ${showControls ? 'text-[#29B6F6] bg-[#29B6F6]/10' : 'text-white'}`}
-                                onClick={() => setShowControls(!showControls)}
+                                className={`h-10 w-10 rounded-full bg-white/5 ${showControls ? 'text-[#29B6F6]' : 'text-white'}`}
+                                onClick={() => {
+                                    setShowControls(true);
+                                    // Optional: Scroll to library or just open sidebar where library is
+                                }}
                             >
-                                <Settings className="h-5 w-5" />
+                                <BookOpen className="h-5 w-5" />
                             </Button>
-                            <span className="text-[9px] text-gray-400">Ajustes</span>
+                            <span className="text-[9px] text-gray-400">Librería</span>
                         </div>
                     )}
 
@@ -1988,6 +2004,8 @@ function Converter() {
                                 shadow-intensity="1"
                                 ar-scale="auto"
                                 ar-placement="floor"
+                                ios-src={arBlobUrl} // Try passing same blob for iOS (sometimes works if GLB is compliant)
+                                quick-look-browsers="safari chrome"
                                 style={{ width: '100%', height: '100%' }}
                             >
                                 <Button
