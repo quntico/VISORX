@@ -221,6 +221,7 @@ function Converter() {
     // --- 3D STATE ---
     const [modelFile, setModelFile] = useState(null);
     const [modelObject, setModelObject] = useState(null);
+    const modelObjectRef = useRef(null); // Fix stale closure in animate
     const [modelStats, setModelStats] = useState(null); // New Stats State
     const mountRef = useRef(null);
     const sceneRef = useRef(null);
@@ -229,6 +230,23 @@ function Converter() {
     const controlsRef = useRef(null); // Added ref for controls
     const fileInput3DRef = useRef(null);
     const progressStartTime = useRef(0); // Track start time for estimation
+
+    // ROTATION STATE
+    const [isAutoRotate, setIsAutoRotate] = useState(false);
+    const [rotationAxis, setRotationAxis] = useState('y');
+    const autoRotateRef = useRef(false);
+    const rotationAxisRef = useRef('y');
+
+    // Sync refs for animation loop
+    useEffect(() => {
+        autoRotateRef.current = isAutoRotate;
+        rotationAxisRef.current = rotationAxis;
+    }, [isAutoRotate, rotationAxis]);
+
+    // Sync model object ref
+    useEffect(() => {
+        modelObjectRef.current = modelObject;
+    }, [modelObject]);
 
     // ==================== IMAGE LOGIC ====================
     const handleImageFileChange = (e) => {
@@ -372,6 +390,14 @@ function Converter() {
             // Animation Loop
             const animate = () => {
                 animationId = requestAnimationFrame(animate);
+
+                // Auto Rotation Logic
+                if (modelObjectRef.current && autoRotateRef.current) {
+                    // Apply rotation based on selected axis
+                    const axis = rotationAxisRef.current;
+                    modelObjectRef.current.rotation[axis] += 0.01;
+                }
+
                 if (controls) controls.update();
                 if (renderer && scene && camera) renderer.render(scene, camera);
             };
@@ -1307,7 +1333,7 @@ function Converter() {
                             </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="hidden md:flex gap-2">
                             {activeTab === 'image' ? (
                                 <>
                                     <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="text-xs border-[#29B6F6]/30 text-[#29B6F6] hover:bg-[#29B6F6]/10">
@@ -1346,6 +1372,21 @@ function Converter() {
                         </div>
                     </div>
                 </header>
+
+                {/* STATUS BAR - Loading/Progress Feedback */}
+                {(loading || uploadStatus) && (
+                    <div className="w-full bg-[#151B23] border-b border-[#29B6F6]/20 p-2 flex items-center justify-center gap-3 text-xs text-[#29B6F6] animate-in slide-in-from-top-5 duration-300">
+                        <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                        <span className="font-medium truncate max-w-[80vw] text-center">
+                            {uploadStatus || "Procesando..."}
+                        </span>
+                        {progress > 0 && (
+                            <span className="font-mono opacity-80 shrink-0">
+                                {progress}%
+                            </span>
+                        )}
+                    </div>
+                )}
 
                 {/* Mobile Tabs (if screen small) */}
                 <div className="sm:hidden p-2 bg-[#151B23] flex justify-center border-b border-white/5 shrink-0">
@@ -1620,6 +1661,35 @@ function Converter() {
                                         </div>
                                     </div>
 
+                                    {/* ROTATION CONTROLS (NEW) */}
+                                    <div className="space-y-4 pt-4 border-t border-white/10">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs text-white font-medium">Animación (Giro)</label>
+                                            <div
+                                                onClick={() => setIsAutoRotate(!isAutoRotate)}
+                                                className={`w-10 h-5 rounded-full flex items-center p-1 cursor-pointer transition-colors ${isAutoRotate ? 'bg-green-500' : 'bg-gray-700'}`}
+                                            >
+                                                <div className={`h-3 w-3 rounded-full bg-white shadow-sm transform transition-transform ${isAutoRotate ? 'translate-x-5' : 'translate-x-0'}`} />
+                                            </div>
+                                        </div>
+
+                                        {isAutoRotate && (
+                                            <div className="flex gap-2">
+                                                {['x', 'y', 'z'].map(axis => (
+                                                    <Button
+                                                        key={axis}
+                                                        size="sm"
+                                                        variant={rotationAxis === axis ? "secondary" : "ghost"}
+                                                        onClick={() => setRotationAxis(axis)}
+                                                        className={`flex-1 text-xs h-7 ${rotationAxis === axis ? 'bg-[#29B6F6] text-black' : 'text-gray-400 border border-white/10'}`}
+                                                    >
+                                                        Eje {axis.toUpperCase()}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     <div className="h-px bg-white/10" />
 
                                     {/* LIBRARY MOVED HERE */}
@@ -1690,6 +1760,88 @@ function Converter() {
                         </>
                     )}
 
+                </div>
+
+                {/* BOTTOM TOOLBAR (MOBILE ONLY) */}
+                <div className="md:hidden bg-[#151B23] border-t border-white/10 p-2 flex justify-around items-center shrink-0 z-50 pb-safe">
+                    {/* Upload */}
+                    <div className="flex flex-col items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 rounded-full bg-white/5 text-[#29B6F6]"
+                            onClick={() => {
+                                if (activeTab === 'image') fileInputRef.current?.click();
+                                else setShowUploadDialog(true);
+                            }}
+                        >
+                            <Upload className="h-5 w-5" />
+                        </Button>
+                        <span className="text-[9px] text-gray-400">Subir</span>
+                    </div>
+
+                    {/* Center */}
+                    {activeTab === '3d' && (
+                        <div className="flex flex-col items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 rounded-full bg-white/5 text-white"
+                                onClick={handleCenterView}
+                                disabled={!modelObject}
+                            >
+                                <ZoomIn className="h-5 w-5" />
+                            </Button>
+                            <span className="text-[9px] text-gray-400">Centrar</span>
+                        </div>
+                    )}
+
+                    {/* AR - MAIN ACTION */}
+                    {activeTab === '3d' && (
+                        <div className="flex flex-col items-center gap-1 -mt-6">
+                            <Button
+                                className="h-14 w-14 rounded-full bg-[#29B6F6] hover:bg-[#29B6F6] text-[#0B0F14] shadow-lg shadow-[#29B6F6]/20 border-4 border-[#0B0F14]"
+                                onClick={handleOpenAR}
+                                disabled={!modelObject || loading}
+                            >
+                                <Camera className="h-7 w-7" />
+                            </Button>
+                            <span className="text-[10px] font-bold text-[#29B6F6]">AR</span>
+                        </div>
+                    )}
+
+                    {/* Controls Toggle (Menu) */}
+                    {activeTab === '3d' && (
+                        <div className="flex flex-col items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={`h-10 w-10 rounded-full bg-white/5 ${showControls ? 'text-[#29B6F6] bg-[#29B6F6]/10' : 'text-white'}`}
+                                onClick={() => setShowControls(!showControls)}
+                            >
+                                <Settings className="h-5 w-5" />
+                            </Button>
+                            <span className="text-[9px] text-gray-400">Ajustes</span>
+                        </div>
+                    )}
+
+
+                    {/* Save/Download */}
+                    <div className="flex flex-col items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 rounded-full bg-white/5 text-green-400"
+                            onClick={() => {
+                                if (activeTab === 'image') handleImageDownload();
+                                else setShowSaveDialog(true);
+                            }}
+                            disabled={(!image && !modelObject) || loading}
+                        >
+                            <Save className="h-5 w-5" />
+                        </Button>
+                        <span className="text-[9px] text-gray-400">Guardar</span>
+                    </div>
                 </div>
             </div>
 
@@ -1814,18 +1966,18 @@ function Converter() {
             </Dialog>
             {/* AR PREVIEW DIALOG */}
             <Dialog open={showAR} onOpenChange={setShowAR}>
-                <DialogContent className="bg-[#151B23] border-[#29B6F6]/20 text-white sm:max-w-xl">
-                    <DialogHeader>
+                <DialogContent className="bg-[#151B23] border-[#29B6F6]/20 text-white w-screen h-screen max-w-none m-0 rounded-none flex flex-col p-0">
+                    <DialogHeader className="p-4 bg-[#0B0F14] shrink-0">
                         <DialogTitle className="flex items-center gap-2 text-white">
                             <Camera className="h-5 w-5 text-[#29B6F6]" />
                             Previsualización AR
                         </DialogTitle>
-                        <DialogDescription className="text-gray-400">
-                            Usa tu cámara o mueve el modelo para ver cómo quedaría.
+                        <DialogDescription className="text-gray-400 text-xs">
+                            Apunta tu cámara a una superficie plana.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="w-full h-[400px] bg-black/50 rounded-lg overflow-hidden border border-white/10 relative">
+                    <div className="flex-1 bg-black/50 overflow-hidden relative">
                         {arBlobUrl && (
                             <model-viewer
                                 src={arBlobUrl}
@@ -1834,23 +1986,26 @@ function Converter() {
                                 camera-controls
                                 auto-rotate
                                 shadow-intensity="1"
+                                ar-scale="auto"
+                                ar-placement="floor"
                                 style={{ width: '100%', height: '100%' }}
                             >
-                                <div slot="ar-button" className="absolute bottom-4 right-4">
-                                    <Button className="bg-[#29B6F6] text-black hover:bg-[#29B6F6]/90 shadow-lg">
-                                        <Camera className="h-4 w-4 mr-2" /> Activar Cámara
-                                    </Button>
-                                </div>
+                                <Button
+                                    slot="ar-button"
+                                    className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-[#29B6F6] text-black hover:bg-[#29B6F6]/90 shadow-xl rounded-full px-8 py-6 text-lg font-bold animate-pulse z-50 pointer-events-auto"
+                                >
+                                    <Camera className="h-6 w-6 mr-2" /> Activar Cámara
+                                </Button>
                             </model-viewer>
                         )}
                     </div>
 
-                    <DialogFooter>
-                        <div className="text-[10px] text-gray-500 text-left w-full">
-                            * AR requiere un dispositivo compatible (Android con ARCore o iOS con ARKit) o un navegador de escritorio con WebXR.
+                    <div className="p-4 bg-[#0B0F14] shrink-0 flex flex-col gap-2">
+                        <div className="text-[10px] text-gray-500 text-center w-full">
+                            * Requiere Android (Chrome) o iOS (Safari) compatible con AR.
                         </div>
-                        <Button onClick={() => setShowAR(false)} variant="ghost">Cerrar</Button>
-                    </DialogFooter>
+                        <Button onClick={() => setShowAR(false)} variant="secondary" className="w-full">Cerrar</Button>
+                    </div>
                 </DialogContent>
             </Dialog>
         </>
