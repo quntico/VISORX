@@ -257,6 +257,9 @@ function Converter() {
     const [iosSrc, setIosSrc] = useState(null);
     const [isGeneratingAR, setIsGeneratingAR] = useState(false);
 
+    // MOBILE UI STATE
+    const [showMobileLibrary, setShowMobileLibrary] = useState(false);
+
     // Sync refs for animation loop
     useEffect(() => {
         autoRotateRef.current = isAutoRotate;
@@ -1485,7 +1488,6 @@ function Converter() {
                                     </div>
                                 </div>
                             </aside>
-                            )}
                             <main
                                 className="flex-1 bg-[#05080A] relative overflow-hidden flex items-center justify-center cursor-move"
                                 onMouseDown={handleImgMouseDown}
@@ -1776,7 +1778,6 @@ function Converter() {
 
                                 </div>
                             </aside>
-                            )}
                         </>
                     )}
 
@@ -1841,18 +1842,16 @@ function Converter() {
                         </Button>
                         <span className="text-[9px] text-gray-400">Ajustes</span>
                     </div>
-                    )}
-
-                    {/* Library Toggle (Replaces simple settings or adds to it) -> User requested Library specifically */}
+                    {/* Library Toggle */}
                     {activeTab === '3d' && (
                         <div className="flex flex-col items-center gap-1">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className={`h-10 w-10 rounded-full bg-white/5 ${showControls ? 'text-[#29B6F6]' : 'text-white'}`}
+                                className={`h-10 w-10 rounded-full bg-white/5 ${showMobileLibrary ? 'text-[#29B6F6]' : 'text-white'}`}
                                 onClick={() => {
-                                    setShowControls(true);
-                                    // Optional: Scroll to library or just open sidebar where library is
+                                    setShowMobileLibrary(true);
+                                    loadAllData(); // Refresh on open
                                 }}
                             >
                                 <BookOpen className="h-5 w-5" />
@@ -2047,7 +2046,89 @@ function Converter() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* MOBILE LIBRARY OVERLAY */}
+            <MobileLibraryOverlay
+                open={showMobileLibrary}
+                onClose={() => setShowMobileLibrary(false)}
+                models={userModels}
+                onLoadModel={handleLoadModel}
+                onDeleteModel={handleDeleteModel}
+                loading={loading}
+            />
         </>
+    );
+}
+
+// Mobile Library Overlay Component
+function MobileLibraryOverlay({ open, onClose, models, onLoadModel, onDeleteModel, loading }) {
+    if (!open) return null;
+
+    return (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex flex-col animate-in fade-in duration-200">
+            {/* Header */}
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/40 shrink-0">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-[#29B6F6]" />
+                    Tu Librería
+                </h3>
+                <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full h-8 w-8 bg-white/10 text-white">
+                    <X className="h-5 w-5" />
+                </Button>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                {models.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-60">
+                        <BoxIcon className="h-12 w-12 mb-2" />
+                        <p>No hay modelos guardados</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                        {models.map(m => (
+                            <div
+                                key={m.id}
+                                onClick={() => {
+                                    onLoadModel(m);
+                                    onClose();
+                                }}
+                                className="bg-white/5 rounded-lg overflow-hidden border border-white/10 active:scale-95 transition-transform"
+                            >
+                                <div className="aspect-square bg-black/20 relative">
+                                    {m.file_url ? (
+                                        <img
+                                            src={m.file_url.replace(/\.(glb|gltf|fbx|obj|tm|skp)$/i, '.png')}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                        />
+                                    ) : <div className="w-full h-full flex items-center justify-center"><BoxIcon className="text-gray-600" /></div>}
+
+                                    <div className="absolute top-1 right-1">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onDeleteModel(e, m.id); }}
+                                            className="p-1.5 bg-red-500/80 text-white rounded-full shadow-sm"
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="p-2">
+                                    <p className="text-xs font-bold text-white truncate">{m.name}</p>
+                                    <p className="text-[10px] text-gray-400">{new Date(m.created_at).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div className="p-4 border-t border-white/10 bg-black/40 shrink-0">
+                <Button onClick={onClose} className="w-full bg-[#29B6F6] text-black font-bold">
+                    Cerrar Librería
+                </Button>
+            </div>
+        </div>
     );
 }
 
