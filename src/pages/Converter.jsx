@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon, Loader2, RotateCw, AlertCircle, Camera } from 'lucide-react';
+import { ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon, Loader2, RotateCw, AlertCircle, Camera, Search, Trash2, Eye, X, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
@@ -23,7 +23,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'; // Added for saved files
+import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader'; // Added for .dae support
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
+import { TGALoader } from 'three/examples/jsm/loaders/TGALoader';
+import JSZip from 'jszip'; // For ZIP support
 import { projectsService, modelsService, storageService } from '@/lib/data-service';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,18 +38,40 @@ function Converter() {
     const { t } = useLanguage();
     const { user } = useAuth();
 
-    // UI STATES
-    const [activeTab, setActiveTab] = useState("image");
+    const [activeTab, setActiveTab] = useState("3d"); // Default to 3D per user request
+    const [showLibrary, setShowLibrary] = useState(false); // Library sidebar toggle
+    const [disableFog, setDisableFog] = useState(false); // Fog toggle
+    const [showGuide, setShowGuide] = useState(false); // Guide toggle
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0); // Progress 0-100
     const [projects, setProjects] = useState([]);
+
+    // ... refs
+
+    // FOG TOGGLE EFFECT
+    useEffect(() => {
+        if (!sceneRef.current) return;
+        if (disableFog) {
+            sceneRef.current.fog = null;
+        } else {
+            sceneRef.current.fog = new THREE.Fog(0x151b23, 200, 100000); // Re-enable fog
+        }
+    }, [disableFog]);
     const [userModels, setUserModels] = useState([]); // List of saved models
     const [uploadStatus, setUploadStatus] = useState(""); // Specific status message for loading overlay
+    const [searchTerm, setSearchTerm] = useState(""); // Search filter
+    const [isDragging, setIsDragging] = useState(false); // Drag & Drop state
 
     // DIALOG STATES
     const [showHelpDialog, setShowHelpDialog] = useState(false);
     const [helpContent, setHelpContent] = useState(null);
     const [showSaveDialog, setShowSaveDialog] = useState(false);
+    const [showUploadDialog, setShowUploadDialog] = useState(false);
+    const [isRxMode, setIsRxMode] = useState(false); // New state for Wireframe/RX Mode
+    const [showControls, setShowControls] = useState(true); // Right Sidebar Visibility
+
+    const [modelColor, setModelColor] = useState(null); // Manual Color override. Null = no override.
+    const [modelY, setModelY] = useState(0); // Vertical Position Adjustment
     const [saveData, setSaveData] = useState({ name: '', projectId: '' });
     const [largeFileToUpload, setLargeFileToUpload] = useState(null); // New state for large file confirmation
 
@@ -59,21 +84,33 @@ function Converter() {
 
     const loadAllData = async () => {
         try {
-            const projs = await projectsService.getAll();
-            setProjects(projs);
+            // Parallel Fetching for Speed using the new getAll method
+            const [projs, allModels] = await Promise.all([
+                projectsService.getAll(),
+                modelsService.getAll()
+            ]);
 
-            // Fetch models from all projects to build "My Library"
-            let allModels = [];
-            for (const p of projs) {
-                const pModels = await modelsService.getByProject(p.id);
-                if (pModels) allModels = [...allModels, ...pModels];
-            }
-            // Sort by newest
-            allModels.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            setProjects(projs);
             setUserModels(allModels);
+            if (activeTab === '3d' && showSaveDialog) {
+                // If we just saved, scroll to top or finding the new model could be improved in future
+            }
+
+            console.log(`Debug: User ${user?.id} found ${projs.length} projects, ${allModels.length} models`);
+
+            // Explicit feedback for debugging
+            toast({
+                title: "Librería Actualizada",
+                description: `Encontrados: ${allModels.length} modelos en ${projs.length} proyectos.`,
+                variant: "default" // Always default/blue, red is too alarming for empty library
+            });
         } catch (e) {
             console.error("Error loading library:", e);
-            toast({ title: t('common.error'), description: "No se pudieron cargar los modelos guardados.", variant: "destructive" });
+            toast({
+                title: "Error de Librería",
+                description: "Fallo de conexión: " + e.message,
+                variant: "destructive"
+            });
         }
     };
 
@@ -178,12 +215,13 @@ function Converter() {
     const canvasRef = useRef(null);
     const imgContainerRef = useRef(null);
     const fileInputRef = useRef(null);
-    const isDragging = useRef(false);
-    const dragStart = useRef({ x: 0, y: 0 });
+    const isPanning = useRef(false); // Renamed from isDragging to avoid conflict
+    const panStart = useRef({ x: 0, y: 0 });
 
     // --- 3D STATE ---
     const [modelFile, setModelFile] = useState(null);
     const [modelObject, setModelObject] = useState(null);
+    const [modelStats, setModelStats] = useState(null); // New Stats State
     const mountRef = useRef(null);
     const sceneRef = useRef(null);
     const cameraRef = useRef(null);
@@ -236,15 +274,15 @@ function Converter() {
 
     const handleImgMouseDown = (e) => {
         if (!image) return;
-        isDragging.current = true;
-        dragStart.current = { x: e.clientX - imgPos.x, y: e.clientY - imgPos.y };
+        isPanning.current = true;
+        panStart.current = { x: e.clientX - imgPos.x, y: e.clientY - imgPos.y };
     };
     const handleImgMouseMove = (e) => {
-        if (!isDragging.current || !image) return;
+        if (!isPanning.current || !image) return;
         e.preventDefault();
-        setImgPos({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
+        setImgPos({ x: e.clientX - panStart.current.x, y: e.clientY - panStart.current.y });
     };
-    const handleImgMouseUp = () => { isDragging.current = false; };
+    const handleImgMouseUp = () => { isPanning.current = false; };
 
     const handleImageDownload = () => {
         if (!image) return;
@@ -268,6 +306,8 @@ function Converter() {
         if (activeTab !== '3d') return;
         if (!mountRef.current) return;
 
+        let animationId;
+
         // Cleanup previous scene if exists to avoid dupes
         if (rendererRef.current) {
             mountRef.current.innerHTML = '';
@@ -276,293 +316,515 @@ function Converter() {
         const width = mountRef.current.clientWidth;
         const height = mountRef.current.clientHeight;
 
-        // Scene
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x151b23); // Dark localized bg
-        scene.fog = new THREE.Fog(0x151b23, 10, 50);
+        if (width === 0 || height === 0) {
+            console.warn("3D Container has 0 dimensions, retrying...");
+            return;
+        }
 
-        // Grid (Ground)
-        const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
-        scene.add(gridHelper);
+        let renderer;
 
-        // Lights
-        // Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-        scene.add(ambientLight);
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
-        hemiLight.position.set(0, 20, 0);
-        scene.add(hemiLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        dirLight.position.set(5, 10, 7.5);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
+        try {
+            // Scene
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x151b23); // Dark localized bg
+            if (!disableFog) {
+                scene.fog = new THREE.Fog(0x151b23, 200, 100000);
+            } else {
+                scene.fog = null;
+            }
 
-        // Camera
-        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        camera.position.set(0, 5, 10);
+            // Grid (Ground)
+            const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+            scene.add(gridHelper);
 
-        // Renderer
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(width, height);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        mountRef.current.appendChild(renderer.domElement);
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+            scene.add(ambientLight);
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+            hemiLight.position.set(0, 20, 0);
+            scene.add(hemiLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            dirLight.position.set(5, 10, 7.5);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
 
-        // Controls
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controlsRef.current = controls;
+            // Camera
+            const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.set(0, 5, 10);
 
-        // Save refs
-        sceneRef.current = scene;
-        cameraRef.current = camera;
-        rendererRef.current = renderer;
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            mountRef.current.appendChild(renderer.domElement);
 
-        // Animation Loop
-        let animationId;
-        const animate = () => {
-            animationId = requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        };
-        animate();
+            // Controls
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controlsRef.current = controls;
+
+            // Save refs
+            sceneRef.current = scene;
+            cameraRef.current = camera;
+            rendererRef.current = renderer;
+
+            // Animation Loop
+            const animate = () => {
+                animationId = requestAnimationFrame(animate);
+                if (controls) controls.update();
+                if (renderer && scene && camera) renderer.render(scene, camera);
+            };
+            animate();
+        } catch (error) {
+            console.error("ThreeJS Init Error:", error);
+            // toast({ title: "Error 3D", description: "No se pudo iniciar el motor gráfico.", variant: "destructive" });
+        }
 
         // Handle Resize
         const handleResize = () => {
-            if (!mountRef.current) return;
+            if (!mountRef.current || !cameraRef.current || !rendererRef.current) return;
             const newW = mountRef.current.clientWidth;
             const newH = mountRef.current.clientHeight;
-            camera.aspect = newW / newH;
-            camera.updateProjectionMatrix();
-            renderer.setSize(newW, newH);
+            cameraRef.current.aspect = newW / newH;
+            cameraRef.current.updateProjectionMatrix();
+            rendererRef.current.setSize(newW, newH);
         };
         window.addEventListener('resize', handleResize);
 
         return () => {
             window.removeEventListener('resize', handleResize);
-            cancelAnimationFrame(animationId);
-            if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
-            // Basic cleanup
-            renderer.dispose();
+            if (animationId) cancelAnimationFrame(animationId);
+
+            // Use local var if available, otherwise ref
+            const rendererToDispose = renderer || rendererRef.current;
+
+            if (mountRef.current && rendererToDispose && rendererToDispose.domElement) {
+                // Check if child exists before removing
+                if (mountRef.current.contains(rendererToDispose.domElement)) {
+                    mountRef.current.removeChild(rendererToDispose.domElement);
+                }
+            }
+
+            if (rendererToDispose) {
+                rendererToDispose.dispose();
+                rendererToDispose.forceContextLoss();
+            }
+            rendererRef.current = null;
         };
     }, [activeTab]);
 
     // 3D UTILS
     const fitModelToView = (object) => {
+        // Force world matrix update to get accurate box
+        object.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(object);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
 
-        // Center the model
+        // 1. Center the model (Critical for rotation)
         object.position.sub(center);
 
-        // Normalize scale (fit into a 10 unit box)
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const targetSize = 10;
+        // 2. DO NOT SCALE (Preserve Original Dimensions)
+        // User requested: "escale a las medidas que tiene en mm" -> meaning keep original units.
+        object.scale.setScalar(1);
 
-        // Safety: Prevent division by zero if model is empty/point
-        if (maxDim <= 0.0001) {
-            console.warn("Model has zero dimension. Skipping auto-scale.");
+        // 3. Move Camera to Fit Object
+        const maxDim = Math.max(size.x, size.y, size.z);
+
+        // Avoid zero-size issues
+        if (maxDim <= 0.0001) return object;
+
+        // SAFETY CHECK: Ensure Camera Exists
+        if (!cameraRef.current) {
+            console.warn("Camera not initialized, skipping auto-fit.");
             return object;
         }
 
-        const scale = targetSize / maxDim;
-        object.scale.setScalar(scale);
+        // Calculate distance to fit model in view
+        // fov is 45 degrees. distance = size / (2 * tan(fov/2))
+        const fov = cameraRef.current.fov * (Math.PI / 180);
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
 
-        // Reset position Y to sit on grid after scaling
-        // Re-calculate box after scale implies dimensions changed
-        const scaledSizeY = size.y * scale;
-        object.position.y = scaledSizeY / 2;
+        // Clamp minimum zoom so we don't end up inside small objects
+        if (cameraZ < 1) cameraZ = 2;
 
-        // Force Camera Focus
-        if (controlsRef.current && cameraRef.current) {
+        if (controlsRef.current) {
             controlsRef.current.target.set(0, 0, 0);
+
+            // Position camera up and front
+            cameraRef.current.position.set(cameraZ * 0.5, cameraZ * 0.5, cameraZ);
+
+            // Ensure far/near clipping planes can see it
+            cameraRef.current.near = maxDim / 1000;
+            cameraRef.current.far = maxDim * 100;
+            cameraRef.current.updateProjectionMatrix();
+
             controlsRef.current.update();
-            cameraRef.current.position.set(0, 5, 10);
-            cameraRef.current.lookAt(0, 0, 0);
         }
+
+        // Update Stats with REAL dimensions
+        setModelStats({
+            x: size.x,
+            y: size.y,
+            z: size.z
+        });
 
         return object;
     };
 
+    // RX Mode Effect - Toggle Wireframe
+    useEffect(() => {
+        if (!modelObject) return;
+
+        modelObject.traverse((child) => {
+            if (child.isMesh) {
+                if (isRxMode) {
+                    // Save original if not already saved
+                    if (!child.userData.originalMat) {
+                        child.userData.originalMat = child.material;
+                    }
+                    // Apply RX/Wireframe Material
+                    // White wireframe like the ironman image
+                    // Apply RX/Wireframe Material
+                    // Electric Blue Wireframe (#29B6F6)
+                    child.material = new THREE.MeshBasicMaterial({
+                        color: 0x29B6F6,
+                        wireframe: true,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                } else {
+                    // Restore original
+                    if (child.userData.originalMat) {
+                        child.material = child.userData.originalMat;
+                    }
+                }
+            }
+        });
+    }, [isRxMode, modelObject]);
+
+    // SAVE ORIGINAL MATERIALS ON LOAD (For Reset)
+    useEffect(() => {
+        if (!modelObject) return;
+        modelObject.traverse((child) => {
+            if (child.isMesh && child.material && !child.userData.initialMat) {
+                // Clone deeply to ensure we have a true backup of the state right after load
+                child.userData.initialMat = child.material.clone();
+            }
+        });
+    }, [modelObject]);
+
+    // Color Override Effect
+    useEffect(() => {
+        if (!modelObject || isRxMode || !modelColor) return; // Don't override if null or RX
+
+        // If color is white, we might not want to force it if textures exist,
+        // but user asked for manual control.
+        // Let's only apply if user explicitly changed it (we can't know that easily without tracking initial).
+        // For now, simple application:
+
+        modelObject.traverse((child) => {
+            if (child.isMesh && child.material) {
+                // If standard material, update color
+                if (child.material.color) {
+                    child.material.color.set(modelColor);
+                }
+            }
+        });
+    }, [modelColor, isRxMode, modelObject]);
+
+    const handleManualTexture = (e) => {
+        const file = e.target.files[0];
+        if (!file || !modelObject) return;
+
+        const url = URL.createObjectURL(file);
+        const tex = new THREE.TextureLoader().load(url);
+        tex.encoding = THREE.sRGBEncoding;
+
+        modelObject.traverse((child) => {
+            if (child.isMesh && child.material) {
+                // We don't clone material here, just swap map
+                child.material.map = tex;
+                child.material.needsUpdate = true;
+            }
+        });
+        toast({ title: "Textura Aplicada", description: "Se ha aplicado la textura al modelo." });
+    };
+
+    const handleResetStyle = () => {
+        if (!modelObject) return;
+
+        // 1. Reset States
+        setIsRxMode(false);
+        setModelColor(null); // No override
+
+        // 2. Restore Materials
+        modelObject.traverse((child) => {
+            if (child.isMesh && child.userData.initialMat) {
+                child.material = child.userData.initialMat.clone(); // Restore from backup
+            }
+        });
+
+        // Reset file input if needed
+        const fileInput = document.getElementById('manual-texture-upload');
+        if (fileInput) fileInput.value = '';
+
+        toast({ title: "Estilo Restaurado", description: "Se han recuperado los colores originales." });
+    };
+
     const handleCenterView = () => {
-        if (controlsRef.current && cameraRef.current) {
-            controlsRef.current.target.set(0, 0, 0);
-            controlsRef.current.update();
-            cameraRef.current.position.set(0, 5, 10);
-            cameraRef.current.lookAt(0, 0, 0);
+        if (modelObject) {
+            fitModelToView(modelObject);
+            // Also reset Y manual offset when centering, or keep it? 
+            // Usually centering resets position. Let's keep manual offset explicitly separate or re-apply it.
+            // Actually fitModel centers geometry. The manual offset moves the WHOLE object group.
+            setModelY(0);
+        } else if (controlsRef.current) {
+            controlsRef.current.reset();
         }
+    };
+
+    // Apply Y Position
+    useEffect(() => {
+        if (modelObject) {
+            modelObject.position.y = modelY;
+        }
+    }, [modelY, modelObject]);
+
+    // DRAG & DROP HANDLERS
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length === 0) return;
+        processFiles(files);
     };
 
     const handle3DFileChange = (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
+        processFiles(files);
+    };
+
+    // UNIFIED FILE PROCESSOR (Handles normal files + ZIP extraction)
+    const processFiles = async (files) => {
+        setLoading(true);
+        setUploadStatus("Procesando archivos...");
+
+        const extractedFiles = [];
+
+        try {
+            for (const file of files) {
+                if (file.name.toLowerCase().endsWith('.zip') || file.name.toLowerCase().endsWith('.rar')) {
+                    setUploadStatus(`Extrayendo ${file.name}...`);
+                    const zip = new JSZip();
+                    const contents = await zip.loadAsync(file);
+
+                    for (const filename of Object.keys(contents.files)) {
+                        const zipEntry = contents.files[filename];
+                        if (!zipEntry.dir) {
+                            const blob = await zipEntry.async('blob');
+                            // Fix: Clean filename to avoid path issues
+                            const cleanName = filename.split('/').pop();
+                            const extractedFile = new File([blob], cleanName, { type: blob.type });
+                            extractedFiles.push(extractedFile);
+                        }
+                    }
+                } else {
+                    extractedFiles.push(file);
+                }
+            }
+        } catch (err) {
+            console.error("ZIP Error:", err);
+            toast({ title: "Error ZIP", description: "No se pudo descomprimir el archivo.", variant: "destructive" });
+            setLoading(false);
+            return;
+        }
+
+        if (extractedFiles.length === 0) {
+            setLoading(false);
+            return;
+        }
 
         // 1. Separate Model from Textures
         let mainFile = null;
         const textureMap = new Map();
 
         // Supported 3D formats
-        const modelExts = ['obj', 'fbx', 'glb', 'gltf', 'tm', 'udatasmith', 'skp'];
+        const modelExts = ['obj', 'fbx', 'glb', 'gltf', 'tm', 'udatasmith', 'skp', 'dae'];
 
-        files.forEach(f => {
+        console.log("--- PROCESSING FILES ---");
+        extractedFiles.forEach(f => {
             const ext = f.name.split('.').pop().toLowerCase();
+            console.log(`File: ${f.name} (${ext})`);
+
             if (modelExts.includes(ext)) {
-                mainFile = f; // Take the first valid model found
+                if (!mainFile) mainFile = f; // Take the first valid model found
             } else {
                 // Assume it's a texture/asset
-                textureMap.set(f.name.toLowerCase(), URL.createObjectURL(f));
+                const objUrl = URL.createObjectURL(f);
+                textureMap.set(f.name.toLowerCase(), objUrl);
                 // Add without path too just in case
-                textureMap.set(f.name.split('/').pop().toLowerCase(), URL.createObjectURL(f));
+                const simpleName = f.name.split('/').pop().toLowerCase();
+                textureMap.set(simpleName, objUrl);
+                console.log(`-> Added to TextureMap: ${f.name} (and ${simpleName})`);
             }
         });
 
         if (!mainFile) {
-            toast({ title: t('common.error'), description: "No se encontró un archivo 3D (.obj, .fbx) en la selección.", variant: "destructive" });
+            toast({ title: "Sin modelo", description: "No se encontró ningún archivo 3D compatible (.obj, .fbx, .glb, .dae) en lo que subiste.", variant: "destructive" });
+            setLoading(false);
             return;
         }
 
-        const extension = mainFile.name.split('.').pop().toLowerCase();
-
-        // SIZE CHECK (Limit to 200MB)
         // SIZE CHECK (Limit to 200MB)
         if (mainFile.size > 200 * 1024 * 1024) {
-            // Instead of window.confirm, set state to show custom Dialog
             setLargeFileToUpload(mainFile);
-            e.target.value = ''; // Reset input
             return;
         }
 
-        // TWINMOTION CHECKS
-        if (extension === 'tm' || extension === 'udatasmith') {
-            openGuide('twinmotion');
-            e.target.value = null;
-            return;
-        }
+        // TWINMOTION & SKPC HECKS
+        const ext = mainFile.name.split('.').pop().toLowerCase();
+        if (ext === 'tm' || ext === 'udatasmith') { openGuide('twinmotion'); return; }
+        if (ext === 'skp') { toast({ title: "Archivo SketchUp", description: "Exporta como .OBJ o .FBX", variant: "destructive" }); return; }
 
-        // SKETCHUP CHECK
-        if (extension === 'skp') {
-            toast({
-                title: "Archivo SketchUp (.skp)",
-                description: "Por favor exporta como .OBJ o .FBX desde SketchUp.",
-                variant: "destructive"
-            });
-            e.target.value = null;
-            return;
-        }
+        setUploadStatus("Leyendo modelo 3D...");
+        loadModelFile(mainFile, textureMap);
+    };
 
+    const loadModelFile = (mainFile, textureMap) => {
         setModelFile(mainFile);
-        setModelFile(mainFile);
-        setLoading(true);
-        setUploadStatus("Procesando archivo localmente en el navegador...");
-        setProgress(0);
-        progressStartTime.current = Date.now();
-
-        // 2. Setup Loading Manager for Textures
-        const manager = new THREE.LoadingManager();
-        manager.setURLModifier((url) => {
-            // "url" might be "path/to/texture.png" or just "texture.png"
-            // We need to match it against our flattened uploaded list
-
-            // Normalize: remove relative paths, lower case
-            let fileName = url.replace(/^.*[\\\/]/, '').toLowerCase(); // get basename
-
-            if (textureMap.has(fileName)) {
-                console.log(`Loading texture from upload: ${fileName}`);
-                return textureMap.get(fileName);
-            }
-
-            return url;
-        });
 
         const url = URL.createObjectURL(mainFile);
+        const extension = mainFile.name.split('.').pop().toLowerCase();
 
-        // Clear previous
+        // CLEANUP
         if (modelObject) {
             sceneRef.current.remove(modelObject);
             setModelObject(null);
         }
 
-        const onLoad = (object) => {
-            try {
-                console.log("Raw Loaded Object:", object);
+        // LOADING MANAGER
+        const manager = new THREE.LoadingManager();
+        // Register TGALoader for tga textures
+        manager.addHandler(/\.tga$/i, new TGALoader(manager));
 
-                // 1. VALIDATE GEOMETRY
-                let hasGeometry = false;
-                object.traverse((child) => {
-                    if (child.isMesh || child.isLine || child.isPoints) {
-                        hasGeometry = true;
-                        // Force visibility
-                        child.visible = true;
+        manager.setURLModifier((url) => {
+            // Check if URL is requested as a relative path filename
+            // Handle both standard paths and encoded URIs if necessary
+            const fileName = url.replace(/^.*[\\\/]/, '').toLowerCase();
+
+            console.log(`[Manager] Requesting: ${url} -> Clean: ${fileName}`);
+
+            // Allow matching cleaned name
+            if (textureMap.has(fileName)) {
+                console.log(`[Manager] HIT: Used blob for ${fileName}`);
+                return textureMap.get(fileName);
+            } else {
+                // Try decoding URI component just in case
+                try {
+                    const decoded = decodeURIComponent(fileName);
+                    if (textureMap.has(decoded)) {
+                        console.log(`[Manager] HIT (Decoded): Used blob for ${decoded}`);
+                        return textureMap.get(decoded);
                     }
-                });
-
-                if (!hasGeometry) {
-                    throw new Error("El archivo 3D está vacío o no tiene geometría visible.");
-                }
-
-                // Fix visibility/materials
-                // Fix visibility/materials & Upgrade to StandardMaterial for AR
-                object.traverse((child) => {
-                    if (child.isMesh) {
-                        const oldMat = child.material;
-
-                        // Create a new Standard material which works better for AR/GLB
-                        // We preserve the map (texture) if it exists.
-                        const newMat = new THREE.MeshStandardMaterial({
-                            color: oldMat.color,
-                            map: oldMat.map,
-                            normalMap: oldMat.normalMap,
-                            roughness: 0.6,
-                            metalness: 0.2,
-                            side: THREE.DoubleSide,
-                            transparent: oldMat.transparent,
-                            opacity: oldMat.opacity
-                        });
-
-                        // If it has NO texture map, we give it a nicer default appearance
-                        // instead of pure white/black which looks fake.
-                        if (!oldMat.map) {
-                            // If original was pure black or pure white, make it "Industrial Grey"
-                            const hex = oldMat.color ? oldMat.color.getHex() : 0xffffff;
-                            if (hex === 0x000000 || hex === 0xffffff) {
-                                newMat.color.setHex(0xbbbbbb); // Industrial silver
-                            }
-                        } else {
-                            // If it DOES have a texture, ensure color is white so it doesn't tint the texture
-                            newMat.color.setHex(0xffffff);
-                        }
-
-                        child.material = newMat;
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
-                });
-
-                const normalizedObj = fitModelToView(object);
-
-                sceneRef.current.add(normalizedObj);
-                setModelObject(normalizedObj);
-
-                // Set default name
-                const baseName = mainFile.name.replace(/\.[^/.]+$/, "");
-                setSaveData(prev => ({ ...prev, name: baseName, projectId: projects[0]?.id || '' }));
-
-                toast({ title: t('common.success'), description: "Modelo cargado y optimizado." });
-            } catch (err) {
-                console.error("Processing error:", err);
-                toast({ title: "Error", description: "El modelo cargó pero falló al procesarse.", variant: "destructive" });
-            } finally {
-                setLoading(false);
-                setProgress(0);
-                setUploadStatus("");
+                } catch (e) { }
             }
-        };
+
+            console.log(`[Manager] MISS: ${fileName}`);
+            return url;
+        });
 
         const onProgress = (xhr) => {
             if (xhr.lengthComputable) {
-                const percentComplete = Math.round((xhr.loaded / xhr.total) * 100);
-                setProgress(percentComplete);
+                const percent = (xhr.loaded / xhr.total) * 100;
+                setProgress(Math.round(percent));
+                setUploadStatus(`Cargando modelo... ${Math.round(percent)}%`);
+            }
+        };
+
+        const safeOnLoad = (obj) => {
+            clearTimeout(loadTimeout);
+
+            let finalObject = obj;
+            if (obj.scene) finalObject = obj.scene;
+
+            // Normalize and Add to Scene...
+            try {
+                finalObject.traverse((child) => {
+                    // Do not force visibility - respect file settings
+                    // if (child.isMesh || child.isLine || child.isPoints) child.visible = true;
+
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+
+                        // Improve existing materials if needed, but respect loaded textures
+                        if (child.material) {
+                            child.material.side = THREE.DoubleSide;
+
+                            // Debug Textures
+                            if (child.material.map) {
+                                console.log(`Found texture map on mesh: ${child.name}`, child.material.map);
+                                child.material.map.encoding = THREE.sRGBEncoding; // Ensure color correctness
+                            } else {
+                                // console.log(`No texture map on mesh: ${child.name}`);
+                            }
+
+                            // Ensure standard material for better light
+                            // Only replace if it's not already standard, to avoid losing specific properties
+                            if (!child.material.isMeshStandardMaterial) {
+                                const oldMat = child.material;
+
+                                const newMatParams = {
+                                    color: oldMat.color,
+                                    transparent: oldMat.transparent,
+                                    opacity: oldMat.opacity,
+                                    side: THREE.DoubleSide,
+                                    alphaTest: oldMat.alphaTest || 0,
+                                };
+
+                                // Validate MAP before assigning to prevent WebGL crashes
+                                if (oldMat.map && oldMat.map.isTexture) {
+                                    newMatParams.map = oldMat.map;
+                                    newMatParams.map.needsUpdate = true;
+                                }
+
+                                child.material = new THREE.MeshStandardMaterial(newMatParams);
+                            }
+                        }
+                    }
+                });
+
+                const normalizedObj = fitModelToView(finalObject);
+                sceneRef.current.add(normalizedObj);
+                setModelObject(normalizedObj);
+
+                // Set default name for saving
+                const baseName = mainFile.name.replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
+                setSaveData(prev => ({
+                    ...prev,
+                    name: baseName,
+                    projectId: projects[0]?.id || ''
+                }));
+
+                setLoading(false);
+                setUploadStatus("");
+                toast({ title: "Cargado", description: "Archivo cargado correctamente." });
+            } catch (e) {
+                console.error(e);
+                onError(e);
             }
         };
 
@@ -571,7 +833,7 @@ function Converter() {
             console.error(err);
             setLoading(false);
             setProgress(0);
-            toast({ title: t('common.error'), description: "Error al leer el archivo. Intenta con otro formato.", variant: "destructive" });
+            toast({ title: t('common.error'), description: "Error al leer el archivo.", variant: "destructive" });
         };
 
         // Safety Timeout (60s)
@@ -579,23 +841,19 @@ function Converter() {
             if (loading) {
                 setLoading(false);
                 setProgress(0);
-                toast({ title: "Tiempo excedido", description: "La carga tardó demasiado. Intenta con un archivo más ligero.", variant: "destructive" });
+                toast({ title: "Tiempo excedido", description: "La carga tardó demasiado.", variant: "destructive" });
                 setUploadStatus("Error: Tiempo de espera agotado.");
             }
         }, 60000);
-
-        // Wrap onLoad to clear timeout
-        const safeOnLoad = (obj) => {
-            clearTimeout(loadTimeout);
-            onLoad(obj);
-        };
 
         if (extension === 'obj') {
             new OBJLoader(manager).load(url, safeOnLoad, onProgress, onError);
         } else if (extension === 'fbx') {
             new FBXLoader(manager).load(url, safeOnLoad, onProgress, onError);
+        } else if (extension === 'dae') {
+            // Collada needs specific scaling sometimes, but loader handles parsing
+            new ColladaLoader(manager).load(url, (collada) => safeOnLoad(collada.scene), onProgress, onError);
         } else if (extension === 'glb' || extension === 'gltf') {
-            // Basic support for re-uploading GLBs
             new GLTFLoader(manager).load(url, (gltf) => safeOnLoad(gltf.scene), onProgress, onError);
         } else {
             clearTimeout(loadTimeout);
@@ -603,6 +861,7 @@ function Converter() {
             toast({ title: t('common.error'), description: "Formato no soportado.", variant: "destructive" });
         }
     };
+
 
     // LOAD FROM LIBRARY
     const handleLoadModel = (model) => {
@@ -677,24 +936,65 @@ function Converter() {
         }
     };
 
+    // DELETE MODEL
+    const handleDeleteModel = async (e, modelId) => {
+        e.stopPropagation(); // Prevent loading the model
+        if (!window.confirm("¿Estás seguro de que deseas eliminar este modelo?")) return;
+
+        try {
+            // Optimistic update
+            setUserModels(prev => prev.filter(m => m.id !== modelId));
+
+            await modelsService.delete(modelId);
+            toast({ title: "Eliminado", description: "Modelo eliminado correctamente." });
+        } catch (error) {
+            console.error(error);
+            toast({ title: "Error", description: "No se pudo eliminar el modelo.", variant: "destructive" });
+            loadAllData(); // Revert
+        }
+    };
+
     // GENERATE GLB BLOB
-    const generateGLB = () => {
-        return new Promise((resolve, reject) => {
-            if (!modelObject) {
-                reject(new Error("No model loaded"));
-                return;
-            }
-            const exporter = new GLTFExporter();
-            exporter.parse(
-                modelObject,
-                (gltf) => {
-                    const blob = new Blob([gltf], { type: 'application/octet-stream' });
-                    resolve(blob);
-                },
-                (error) => reject(error),
-                { binary: true }
-            );
-        });
+    // GENERATE GLB BLOB (With Texture Recovery)
+    const generateGLB = async () => {
+        const parseGLB = (obj) => {
+            return new Promise((resolve, reject) => {
+                const exporter = new GLTFExporter();
+                exporter.parse(
+                    obj,
+                    (gltf) => {
+                        const blob = new Blob([gltf], { type: 'application/octet-stream' });
+                        resolve(blob);
+                    },
+                    (error) => reject(error),
+                    { binary: true }
+                );
+            });
+        };
+
+        if (!modelObject) throw new Error("No model loaded");
+
+        try {
+            return await parseGLB(modelObject);
+        } catch (error) {
+            console.warn("Standard export failed, attempting geometry-only export...", error);
+
+            // Clone and strip textures
+            const safeObj = modelObject.clone();
+            safeObj.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = child.material.clone();
+                    child.material.map = null;
+                    child.material.normalMap = null;
+                    child.material.roughnessMap = null;
+                    child.material.metalnessMap = null;
+                    // Ensure nice fallback color
+                    child.material.color.setHex(0xaaaaaa);
+                }
+            });
+
+            return await parseGLB(safeObj);
+        }
     };
 
     const handleDownloadGLB = async () => {
@@ -756,7 +1056,28 @@ function Converter() {
             const file = new File([blob], fileName, { type: 'application/octet-stream' });
 
             // 2. Upload to Supabase Storage
+            // 2. Upload to Supabase Storage
             const publicUrl = await storageService.uploadFile('models', `${user.id}/${targetProjectId}/${fileName}`, file);
+
+            // 2.5 Generate & Upload Thumbnail (Best Effort)
+            try {
+                if (mountRef.current && rendererRef.current && sceneRef.current && cameraRef.current) {
+                    setUploadStatus("Generando miniatura...");
+                    // Render current view to canvas
+                    rendererRef.current.render(sceneRef.current, cameraRef.current);
+                    const canvas = rendererRef.current.domElement;
+
+                    // Convert to blob
+                    const thumbBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.5));
+                    if (thumbBlob) {
+                        const thumbName = fileName.replace(/\.[^/.]+$/, "") + ".png";
+                        await storageService.uploadFile('models', `${user.id}/${targetProjectId}/${thumbName}`, thumbBlob);
+                    }
+                }
+            } catch (thumbErr) {
+                console.warn("Could not generate thumbnail", thumbErr);
+                // Non-critical, continue
+            }
 
             setProgress(85);
 
@@ -764,15 +1085,18 @@ function Converter() {
             await modelsService.create({
                 name: saveData.name,
                 project_id: targetProjectId,
+                project_id: targetProjectId,
+                // user_id: user.id, // Removed: Column does not exist in DB
                 file_url: publicUrl,
-                type: 'glb',
-                size: blob.size,
-                status: 'ready'
+                // size: blob.size, // Removed: Column does not exist in DB
+                // status: 'ready' // Removed: Column does not exist in DB
+                // size: blob.size, // Removed: Column does not exist in DB
             });
 
             setProgress(100);
 
             toast({ title: t('common.success'), description: t('converter.saveSuccess') });
+            loadAllData(); // Refresh library immediately
 
         } catch (error) {
             console.error(error);
@@ -826,10 +1150,12 @@ function Converter() {
             await modelsService.create({
                 name: file.name,
                 project_id: targetProjectId,
+                project_id: targetProjectId,
+                // user_id: user.id, // Removed: Column does not exist in DB
                 file_url: publicUrl,
-                type: ext, // 'fbx', 'obj'
-                size: file.size,
-                status: 'raw'
+                // size: file.size, // Removed: Column does not exist in DB
+                // status: 'raw' // Removed: Column does not exist in DB
+                // size: file.size, // Removed: Column does not exist in DB
             });
 
             setProgress(100);
@@ -837,7 +1163,16 @@ function Converter() {
             toast({ title: "Archivo Guardado", description: "Se subió correctamente. Puedes intentar abrirlo desde 'Tu Librería'." });
 
             // Refresh library
-            setTimeout(() => window.location.reload(), 1500); // Simple refresh to show new model
+            // Show in Viewer immediately using the correct loader
+            handleLoadModel({
+                file_url: publicUrl,
+                name: file.name,
+                type: ext,
+                project_id: targetProjectId
+            });
+
+            // Refresh library list
+            loadAllData();
 
         } catch (error) {
             console.error("Direct Upload Error:", error);
@@ -858,7 +1193,7 @@ function Converter() {
         } finally {
             setLoading(false);
             setProgress(0);
-            // setUploadStatus(""); 
+            // setUploadStatus("");
         }
     };
 
@@ -986,10 +1321,10 @@ function Converter() {
                                 </>
                             ) : (
                                 <>
-                                    <Button onClick={() => fileInput3DRef.current?.click()} variant="outline" className="text-xs border-[#29B6F6]/30 text-[#29B6F6] hover:bg-[#29B6F6]/10">
-                                        <Upload className="h-3 w-3 mr-2" /> {t('converter.uploadModel')} (+ Texturas)
+                                    <Button onClick={() => setShowUploadDialog(true)} variant="outline" className="text-xs border-[#29B6F6]/30 text-[#29B6F6] hover:bg-[#29B6F6]/10">
+                                        <Upload className="h-3 w-3 mr-2" /> Subir ZIP / Pack
                                     </Button>
-                                    <input ref={fileInput3DRef} type="file" className="hidden" multiple accept=".obj,.fbx,.tm,.udatasmith,.skp,.png,.jpg,.jpeg,.tga,.bmp" onChange={handle3DFileChange} />
+                                    <input ref={fileInput3DRef} type="file" className="hidden" multiple accept=".obj,.fbx,.dae,.tm,.udatasmith,.skp,.png,.jpg,.jpeg,.tga,.bmp,.zip,.rar" onChange={handle3DFileChange} />
 
                                     <div className="flex gap-1">
                                         <Button onClick={handleCenterView} disabled={!modelObject} variant="secondary" className="text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20" title="Centrar Cámara">
@@ -1089,6 +1424,7 @@ function Converter() {
                                     </div>
                                 </div>
                             </aside>
+                            )}
                             <main
                                 className="flex-1 bg-[#05080A] relative overflow-hidden flex items-center justify-center cursor-move"
                                 onMouseDown={handleImgMouseDown}
@@ -1123,106 +1459,32 @@ function Converter() {
                     {/* --- 3D MODE --- */}
                     {activeTab === '3d' && (
                         <>
-                            <aside className="w-80 bg-[#151B23] border-r border-white/10 flex flex-col z-10 overflow-y-auto shrink-0">
-
-                                {/* LIBRARY SECTION */}
-                                <div className="p-4 border-b border-white/10">
-                                    <h3 className="text-xs font-bold text-[#29B6F6] uppercase mb-3 flex items-center gap-2">
-                                        <Save className="h-3 w-3" /> Tu Librería
-                                    </h3>
-                                    {userModels.length > 0 ? (
-                                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
-                                            {userModels.map(m => (
-                                                <div
-                                                    key={m.id}
-                                                    onClick={() => handleLoadModel(m)}
-                                                    className="group flex items-center justify-between p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer border border-transparent hover:border-[#29B6F6]/30 transition-all"
-                                                >
-                                                    <div className="flex items-center gap-2 overflow-hidden">
-                                                        <BoxIcon className="h-4 w-4 text-gray-500 group-hover:text-[#29B6F6]" />
-                                                        <div className="truncate">
-                                                            <p className="text-xs text-white font-medium truncate">{m.name}</p>
-                                                            <p className="text-[10px] text-gray-500 truncate">{new Date(m.created_at).toLocaleDateString()}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-4 bg-white/5 rounded border border-white/5 border-dashed">
-                                            <p className="text-xs text-gray-500">No hay modelos guardados.</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="p-6 flex flex-col gap-4">
-                                    {/* GUIDES & STUFF */}
-                                    <div className="bg-[#29B6F6]/5 border border-[#29B6F6]/20 rounded p-4">
-
-                                        <h4 className="text-[#29B6F6] font-bold text-xs mb-2 uppercase flex items-center gap-2">
-                                            <BoxIcon className="h-3 w-3" />
-                                            Guía 3D
-                                        </h4>
-                                        <p className="text-xs text-gray-400 mb-2">
-                                            SketchUp y Twinmotion no exportan web AR nativo. Esta herramienta convierte sus formatos estándar.
-                                        </p>
-                                        <ol className="text-xs text-gray-400 list-decimal list-inside space-y-1">
-                                            <li>En tu programa 3D, exporta como <strong>.OBJ</strong> o <strong>.FBX</strong>.</li>
-                                            <li>Sube el archivo aquí.</li>
-                                            <li>Verifica que se vea bien en el visor.</li>
-                                            <li>Presiona <strong>"{t('converter.saveToProject')}"</strong> para guardarlo en tu cuenta.</li>
-                                        </ol>
+                            {/* DRAG AND DROP OVERLAY */}
+                            {isDragging && (
+                                <div className="absolute inset-0 z-50 bg-[#29B6F6]/20 backdrop-blur-sm border-2 border-dashed border-[#29B6F6] flex items-center justify-center pointer-events-none">
+                                    <div className="text-center bg-[#0B0F14] p-8 rounded-xl border border-[#29B6F6]">
+                                        <Upload className="h-16 w-16 text-[#29B6F6] mx-auto mb-4 animate-bounce" />
+                                        <h3 className="text-xl font-bold text-white">Sueltalo aquí</h3>
+                                        <p className="text-[#29B6F6]">Modelos, Texturas o ZIP</p>
                                     </div>
-
-                                    {modelObject && (
-                                        <div className="space-y-2">
-                                            <h4 className="text-xs font-bold text-white uppercase">Propiedades</h4>
-                                            <div className="bg-[#0B0F14] p-3 rounded text-xs space-y-1 text-gray-400 font-mono">
-                                                <p>Vertices: N/A</p>
-                                                <p>Children: {modelObject.children.length}</p>
-                                                <p>Type: {modelObject.type}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {loading && (
-                                        <div className="flex flex-col items-center justify-center py-6 text-center animate-pulse bg-[#29B6F6]/5 rounded border border-[#29B6F6]/20 p-4">
-                                            <Loader2 className="h-6 w-6 text-[#29B6F6] animate-spin mb-3" />
-                                            <p className="text-xs text-[#29B6F6] font-bold mb-2">
-                                                {uploadStatus || (progress > 0 && progress < 100 ? `Cargando... ${progress}%` : t('converter.converting'))}
-                                            </p>
-
-                                            {/* Progress Bar Track */}
-                                            <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-[#29B6F6] transition-all duration-300 ease-out"
-                                                    style={{ width: `${Math.max(progress, 5)}%` }}
-                                                />
-                                            </div>
-                                            <p className="text-[10px] text-gray-500 mt-2">Esto puede tomar unos segundos.</p>
-                                        </div>
-                                    )}
                                 </div>
-                            </aside>
+                            )}
+
+                            {/* MAIN VIEWPORT WITH DROP HANDLER */}
+                            {/* Left Sidebar REMOVED - Moved content to Right Sidebar */}
+
                             <main
-                                className="flex-1 bg-[#05080A] relative"
+                                className="flex-1 bg-[#05080A] relative flex flex-col items-center justify-center overflow-hidden"
                                 ref={mountRef}
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={(e) => {
-                                    e.preventDefault();
-                                    const file = e.dataTransfer.files[0];
-                                    if (file && fileInput3DRef.current) {
-                                        // Create a fake event to reuse the handler
-                                        const event = { target: { files: [file], value: '' } };
-                                        handle3DFileChange(event);
-                                    }
-                                }}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
                             >
                                 {/* Three JS Canvas creates itself here */}
                                 {!modelObject && !loading && (
                                     <div
                                         onClick={() => fileInput3DRef.current?.click()}
-                                        className="absolute inset-0 flex items-center justify-center cursor-pointer hover:bg-white/5 transition-colors"
+                                        className="absolute inset-0 flex items-center justify-center cursor-pointer hover:bg-white/5 transition-colors z-0"
                                     >
                                         <div className="text-center opacity-40">
                                             <BoxIcon className="h-16 w-16 text-gray-600 mx-auto mb-4" />
@@ -1232,11 +1494,239 @@ function Converter() {
                                     </div>
                                 )}
                             </main>
+
+                            {/* RIGHT CONTROL SIDEBAR */}
+                            {/* Mobile Backdrop */}
+                            {showControls && (
+                                <div
+                                    className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+                                    onClick={() => setShowControls(false)}
+                                />
+                            )}
+
+                            <aside className={`
+                                fixed inset-y-0 right-0 z-50 w-72 bg-[#151B23] border-l border-white/10 flex flex-col shadow-2xl transition-transform duration-300
+                                md:relative md:w-64 md:translate-x-0 md:shadow-none
+                                ${showControls ? 'translate-x-0' : 'translate-x-full md:hidden'}
+                            `}>
+                                <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                                    <h3 className="text-xs font-bold text-[#29B6F6] uppercase flex items-center gap-2">
+                                        <Settings className="h-3 w-3" /> Control de Modelo
+                                    </h3>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-gray-500 md:hidden"
+                                        onClick={() => setShowControls(false)}
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <div className="p-4 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+
+                                    {/* RX Mode Toggle */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs text-white font-medium">Efecto RX (Wireframe)</label>
+                                            <div
+                                                onClick={() => setIsRxMode(!isRxMode)}
+                                                className={`w-10 h-5 rounded-full flex items-center p-1 cursor-pointer transition-colors ${isRxMode ? 'bg-[#29B6F6]' : 'bg-gray-700'}`}
+                                            >
+                                                <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${isRxMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-gray-500">Muestra la estructura geométrica del modelo.</p>
+                                    </div>
+
+                                    <div className="h-px bg-white/10" />
+
+                                    {/* Color Picker */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-white font-medium block">Color Base</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="color"
+                                                value={modelColor || '#ffffff'}
+                                                onChange={(e) => setModelColor(e.target.value)}
+                                                className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0"
+                                            />
+                                            <span className="text-xs text-gray-400 font-mono">{modelColor || 'Original'}</span>
+                                        </div>
+                                        <p className="text-[10px] text-gray-500">Cambia el color de todos los materiales.</p>
+                                    </div>
+
+                                    <div className="h-px bg-white/10" />
+
+                                    {/* Manual Texture */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-white font-medium block">Textura Manual</label>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="w-full text-xs border-dashed border-gray-600 text-gray-400 hover:text-white hover:border-white"
+                                                onClick={() => document.getElementById('manual-texture-upload').click()}
+                                                disabled={!modelObject}
+                                            >
+                                                <Upload className="h-3 w-3 mr-2" />
+                                                Cargar Imagen...
+                                            </Button>
+                                            <input
+                                                id="manual-texture-upload"
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={handleManualTexture}
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-gray-500">Aplica una imagen como textura a todo el modelo.</p>
+                                    </div>
+
+                                    <div className="h-px bg-white/10" />
+
+                                    {/* Reset Button */}
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={handleResetStyle}
+                                        className="w-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20"
+                                    >
+                                        <RotateCw className="h-3 w-3 mr-2" />
+                                        Restaurar Original
+                                    </Button>
+
+                                    <div className="h-px bg-white/10" />
+
+                                    {/* Y-Axis Control (Joystick/Slider) */}
+                                    <div className="space-y-4">
+                                        <label className="text-xs text-white font-medium flex justify-between">
+                                            Posición Vertical (Eje Y)
+                                            <span className="text-gray-400 font-mono">{modelY.toFixed(2)}</span>
+                                        </label>
+                                        <div className="flex items-center gap-2">
+                                            <ArrowLeft className="h-3 w-3 text-gray-500 rotate-90" /> {/* Down visual */}
+                                            <Slider
+                                                value={[modelY]}
+                                                min={-10}
+                                                max={10}
+                                                step={0.1}
+                                                onValueChange={(val) => setModelY(val[0])}
+                                                className="flex-1"
+                                            />
+                                            <ArrowLeft className="h-3 w-3 text-gray-500 -rotate-90" /> {/* Up visual */}
+                                        </div>
+                                        <div className="flex justify-center">
+                                            <Button size="sm" variant="ghost" className="h-6 text-[10px] text-gray-500" onClick={() => setModelY(0)}>Resetear Posición</Button>
+                                        </div>
+                                    </div>
+
+                                    <div className="h-px bg-white/10" />
+
+                                    {/* LIBRARY MOVED HERE */}
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="text-xs font-bold text-[#29B6F6] uppercase flex items-center gap-2">
+                                                <Save className="h-3 w-3" /> Tu Librería
+                                            </h3>
+                                            <div className="flex gap-1">
+                                                <Button
+                                                    variant="ghost" size="icon" className="h-5 w-5 text-gray-500"
+                                                    onClick={() => loadAllData()} title="Recargar"
+                                                >
+                                                    <RotateCw className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {/* Search */}
+                                        <div className="relative">
+                                            <Search className="absolute left-2 top-1.5 h-3 w-3 text-gray-500" />
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar..."
+                                                className="w-full bg-black/20 border border-white/10 rounded pl-7 pr-2 py-1 text-[10px] text-white focus:border-[#29B6F6] outline-none"
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                            />
+                                        </div>
+
+                                        {/* List */}
+                                        <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                                            {userModels
+                                                .filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                                                .map(m => (
+                                                    <div
+                                                        key={m.id}
+                                                        onClick={() => handleLoadModel(m)}
+                                                        className="group relative flex items-start gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer border border-transparent hover:border-[#29B6F6]/30 transition-all"
+                                                    >
+                                                        <div className="w-10 h-10 bg-black/30 rounded border border-white/10 flex items-center justify-center shrink-0 overflow-hidden relative">
+                                                            {m.file_url ? (
+                                                                <img
+                                                                    src={m.file_url.replace(/\.(glb|gltf|fbx|obj|tm|skp)$/i, '.png')}
+                                                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            ) : <BoxIcon className="h-4 w-4 text-gray-600" />}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[11px] text-white font-medium truncate" title={m.name}>{m.name}</p>
+                                                            <p className="text-[9px] text-gray-500 truncate">{new Date(m.created_at).toLocaleDateString()}</p>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => handleDeleteModel(e, m.id)}
+                                                            className="opacity-0 group-hover:opacity-100 p-1 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded transition-all"
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </aside>
+                            )}
                         </>
                     )}
 
                 </div>
             </div>
+
+            {/* NEW UPLOAD DIALOG */}
+            <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                <DialogContent className="bg-[#151B23] border-[#29B6F6]/20 text-white sm:max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-[#29B6F6]">Subir Archivos 3D</DialogTitle>
+                        <DialogDescription className="text-gray-400">
+                            Sube un archivo ZIP con tu modelo y texturas, o arrastra todo tu folder aquí.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div
+                        className="border-2 border-dashed border-[#29B6F6]/40 rounded-xl p-10 flex flex-col items-center justify-center bg-[#0B0F14] hover:bg-[#29B6F6]/5 transition-colors cursor-pointer"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                            setShowUploadDialog(false);
+                            handleDrop(e);
+                        }}
+                        onClick={() => {
+                            setShowUploadDialog(false);
+                            fileInput3DRef.current?.click();
+                        }}
+                    >
+                        <Upload className="h-16 w-16 text-[#29B6F6] mb-4" />
+                        <h3 className="text-lg font-bold text-white mb-2">Arrastra tu ZIP o Archivos aquí</h3>
+                        <p className="text-sm text-gray-500 mb-6 text-center">
+                            Soporta: .DAE, .OBJ, .FBX, .GLB<br />
+                            (Incluye tus texturas imagenes en el mismo ZIP)
+                        </p>
+                        <Button variant="outline" className="border-[#29B6F6] text-[#29B6F6] hover:bg-[#29B6F6] hover:text-black">
+                            Seleccionar Archivos
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* SAVE TO PROJECT DIALOG */}
             <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>

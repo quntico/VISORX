@@ -11,6 +11,7 @@ import PublicViewer from '@/pages/PublicViewer';
 import SetupAdmin from '@/pages/SetupAdmin';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { DebugErrorBoundary } from '@/components/DebugErrorBoundary';
 import { Loader2 } from 'lucide-react';
 
 function LoadingScreen() {
@@ -52,13 +53,13 @@ function App() {
             <Route path="/login" element={<Login />} />
 
             {/* Admin Only */}
-            <Route path="/setup" element={<AdminRoute><SetupAdmin /></AdminRoute>} />
+            <Route path="/setup" element={<AdminRoute><DebugErrorBoundary><SetupAdmin /></DebugErrorBoundary></AdminRoute>} />
 
             {/* Authenticated Users */}
-            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-            <Route path="/converter" element={<PrivateRoute><Converter /></PrivateRoute>} />
-            <Route path="/project/:id" element={<PrivateRoute><Project /></PrivateRoute>} />
-            <Route path="/model/:id" element={<PrivateRoute><ModelView /></PrivateRoute>} />
+            <Route path="/dashboard" element={<PrivateRoute><DebugErrorBoundary><Dashboard /></DebugErrorBoundary></PrivateRoute>} />
+            <Route path="/converter" element={<PrivateRoute><DebugErrorBoundary><Converter /></DebugErrorBoundary></PrivateRoute>} />
+            <Route path="/project/:id" element={<PrivateRoute><DebugErrorBoundary><Project /></DebugErrorBoundary></PrivateRoute>} />
+            <Route path="/model/:id" element={<PrivateRoute><DebugErrorBoundary><ModelView /></DebugErrorBoundary></PrivateRoute>} />
 
             {/* Public Access */}
             <Route path="/v/:token" element={<PublicViewer />} />

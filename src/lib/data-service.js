@@ -73,9 +73,10 @@ export const projectsService = {
     const { data: { user } } = await supabase.auth.getUser();
 
     // 3. Fallback to Mock if no real user (Simulation Mode Auto-Failover)
+    // 3. Fallback to Mock if no real user (Simulation Mode Auto-Failover)
     if (!user) {
-      console.log("No authenticated user found. Falling back to Simulation Mode.");
-      return createMockProject(project);
+      console.error("No authenticated user found for project creation.");
+      throw new Error("Usuario no autenticado. Inicia sesión nuevamente.");
     }
 
     const { data, error } = await supabase
@@ -147,6 +148,23 @@ export const modelsService = {
     return data;
   },
 
+  async getAll() {
+    if (useMock()) {
+      await new Promise(r => setTimeout(r, MOCK_DELAY));
+      return getMockDB().models.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+
+    // RLS will automatically filter by auth.uid() if policy uses it
+    // SIMPLIFIED: Removing join to prevent RLS from hiding models if project is missing
+    const { data, error } = await supabase
+      .from('models')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
   async getById(id) {
     if (useMock()) {
       await new Promise(r => setTimeout(r, MOCK_DELAY));
@@ -190,9 +208,11 @@ export const modelsService = {
       .single();
 
     // Fallback if error (e.g. auth fail or RLS)
+    // Fallback if error (e.g. auth fail or RLS)
     if (error) {
-      console.warn("Real DB insert failed, using mock:", error);
-      return runMock();
+      console.error("Real DB insert failed:", error);
+      // DO NOT FALLBACK TO MOCK silently. Throw the error so the UI knows it failed.
+      throw error;
     }
     return data;
   },

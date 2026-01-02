@@ -233,6 +233,30 @@ function Dashboard() {
               <p className="text-gray-400">{t('dashboard.noProjects')}</p>
             </div>
           )}
+
+          {/* DIAGNOSTIC TOOLS SECTION */}
+          <div className="mt-12 border-t border-white/10 pt-8">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <Settings className="h-5 w-5 text-gray-400" />
+              Diagnóstico & Mantenimiento
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div onClick={() => window.location.reload()} className="bg-[#151B23] p-6 rounded-lg border border-white/5 hover:border-[#29B6F6]/30 cursor-pointer group transition-all">
+                <div className="p-3 bg-red-500/10 rounded-lg w-fit mb-4 group-hover:bg-red-500/20">
+                  <Loader2 className="h-6 w-6 text-red-400" />
+                </div>
+                <h4 className="text-white font-bold mb-1">Recarga Forzada</h4>
+                <p className="text-xs text-gray-400">Si la pantalla se queda negra, usa esto para reiniciar la memoria de la aplicación.</p>
+              </div>
+              <div className="bg-[#151B23] p-6 rounded-lg border border-white/5 opacity-50 cursor-not-allowed">
+                <div className="p-3 bg-blue-500/10 rounded-lg w-fit mb-4">
+                  <ShieldCheck className="h-6 w-6 text-blue-400" />
+                </div>
+                <h4 className="text-white font-bold mb-1">Verificar Estado del Servidor</h4>
+                <p className="text-xs text-gray-400">Comprueba conexión con base de datos (Supabase).</p>
+              </div>
+            </div>
+          </div>
         </main>
 
         <CreateProjectDialog

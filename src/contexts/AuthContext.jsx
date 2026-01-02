@@ -110,21 +110,19 @@ export function AuthProvider({ children }) {
           setUser(session.user);
           await fetchProfile(session.user);
         } else {
-          // NO SESSION? AUTO-ACTIVATE SIMULATION MODE
-          console.log('[AuthDebug] No session. Activating Simulation Mode.');
-          const simUser = { id: 'sim_user', email: 'demo@visorx.com', user_metadata: { full_name: 'Demo User' } };
-          setUser(simUser);
-          setRole('admin');
-          localStorage.setItem('visorx_mode', 'simulation');
+          // NO SESSION? DO NOT AUTO-ACTIVATE SIMULATION MODE
+          // This allows the user to see the Login Screen.
+          console.log('[AuthDebug] No session found. Waiting for user action.');
+          setUser(null);
+          setRole(null);
         }
 
       } catch (error) {
         console.error("[AuthDebug] Auth check failed:", error);
-        // Fallback to simulation on error too
-        const simUser = { id: 'sim_user', email: 'demo@visorx.com' };
-        setUser(simUser);
-        setRole('admin');
-        localStorage.setItem('visorx_mode', 'simulation');
+        // Do not force Simulation Mode on error. Show Login screen.
+        setUser(null);
+        setRole(null);
+        // localStorage.setItem('visorx_mode', 'simulation'); // REMOVED
       } finally {
         clearTimeout(timeoutId);
         setLoading(false);
@@ -163,7 +161,8 @@ export function AuthProvider({ children }) {
       // Use origin only. Let PrivateRoute handle the forwarding to dashboard.
       // If we force /dashboard here, it might conflict if Supabase expects a different callback.
       // Usually Supabase handles the callback and then we redirect.
-      const redirectUrl = window.location.origin;
+      // Redirect directly to dashboard to avoid Router stripping hashtags at root
+      const redirectUrl = window.location.origin + '/dashboard';
       console.log('[AuthDebug] Starting OAuth flow. Redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -192,16 +191,21 @@ export function AuthProvider({ children }) {
   const signOut = async () => {
     console.log('[AuthDebug] Signing out...');
 
-    // Always clear local fallback
-    localStorage.removeItem('visorx_user');
+    try {
+      // always clear local state
+      localStorage.removeItem('visorx_user');
+      localStorage.removeItem('visorx_mode');
 
-    if (!supabase) {
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    } catch (error) {
+      console.error("SignOut fatal error:", error);
+    } finally {
       setUser(null);
       setRole(null);
-    } else {
-      await supabase.auth.signOut();
+      window.location.href = '/login';
     }
-    window.location.href = '/login';
   };
 
   const value = {

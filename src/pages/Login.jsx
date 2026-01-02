@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { supabase } from '@/lib/supabase'; // Import supabase for diagnostics
+import { AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'; // Icons
 
 function Login() {
   const { signInWithGoogle, user, loading } = useAuth();
@@ -128,10 +130,9 @@ function Login() {
                 variant="outline"
                 className="w-full border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 h-10 text-xs"
                 onClick={() => {
-                  // Hack to bypass auth for testing
-                  const fakeUser = { id: 'dev-user', email: 'dev@local.host', role: 'admin' };
-                  localStorage.setItem('visorx_user', JSON.stringify(fakeUser));
-                  window.location.href = '/dashboard';
+                  // Activate Simulation Mode
+                  localStorage.setItem('visorx_mode', 'simulation');
+                  window.location.reload();
                 }}
               >
                 ⚡ Acceso Rápido (Modo Pruebas)
@@ -146,8 +147,81 @@ function Login() {
             </div>
           </div>
         </motion.div>
+
+        {/* DIAGNOSTICS PANEL (New) */}
+        <div className="fixed bottom-4 left-4 right-4 z-50">
+          <DiagnosticsPanel />
+        </div>
+
       </div>
     </>
+  );
+}
+
+// Internal Diagnostics Component
+function DiagnosticsPanel() {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [sessionStatus, setSessionStatus] = React.useState('Unknown');
+  const [lastError, setLastError] = React.useState(null);
+  const { user, loading } = useAuth();
+
+  const checkSession = async () => {
+    setSessionStatus('Checking...');
+    setLastError(null);
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      if (data.session) {
+        setSessionStatus(`Active: ${data.session.user.email}`);
+      } else {
+        setSessionStatus('No Session Found');
+      }
+    } catch (e) {
+      setSessionStatus('Error');
+      setLastError(e.message);
+    }
+  };
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="text-[10px] text-gray-600 hover:text-gray-400 underline w-full text-center"
+      >
+        Abrir Diagnóstico de Conexión
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-black/80 border border-gray-800 p-4 rounded text-xs font-mono text-green-400 w-full max-w-2xl mx-auto backdrop-blur-md">
+      <div className="flex justify-between items-center mb-2 border-b border-gray-700 pb-2">
+        <h3 className="font-bold text-white">SYSTEM DIAGNOSTICS</h3>
+        <button onClick={() => setIsOpen(false)} className="text-gray-500 hover:text-white">✕</button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <strong className="text-gray-500 block mb-1">AUTH CONTEXT</strong>
+          <div>User: {user ? user.email : 'NULL'}</div>
+          <div>Loading: {loading ? 'YES' : 'NO'}</div>
+        </div>
+        <div>
+          <strong className="text-gray-500 block mb-1">SUPABASE RAW</strong>
+          <div className="flex items-center gap-2">
+            <span>{sessionStatus}</span>
+            <button onClick={checkSession} className="bg-gray-700 hover:bg-gray-600 px-2 py-0.5 rounded text-white flex items-center gap-1">
+              <RefreshCw className="w-3 h-3" /> Check
+            </button>
+          </div>
+          {lastError && <div className="text-red-400 mt-1">ERR: {lastError}</div>}
+        </div>
+      </div>
+
+      <div className="mt-2 pt-2 border-t border-gray-800 break-all">
+        <strong className="text-gray-500">CURRENT URL:</strong> {window.location.href}
+      </div>
+    </div>
   );
 }
 
