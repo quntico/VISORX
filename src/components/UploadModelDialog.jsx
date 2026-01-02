@@ -2,8 +2,11 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Upload, AlertCircle, CheckCircle } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle, Loader2, FileType } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import * as THREE from 'three';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
 
 function UploadModelDialog({ open, onOpenChange, onSubmit }) {
   const [name, setName] = useState('');
@@ -11,6 +14,7 @@ function UploadModelDialog({ open, onOpenChange, onSubmit }) {
   const [files, setFiles] = useState({ glb: null, usdz: null });
   const [validation, setValidation] = useState({ glb: null, usdz: null });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
   const { toast } = useToast();
 
   const validateFile = (type, file) => {
@@ -18,30 +22,101 @@ function UploadModelDialog({ open, onOpenChange, onSubmit }) {
     if (file && file.size > maxSize) {
       return { valid: false, message: 'File exceeds 50MB limit' };
     }
-    // Simple extension check
-    if (type === 'glb' && !file.name.toLowerCase().endsWith('.glb')) {
-         return { valid: false, message: 'Must be a .glb file' };
+
+    // Extension checks
+    if (type === 'glb') {
+      const name = file.name.toLowerCase();
+      // Allow GLB and FBX
+      if (!name.endsWith('.glb') && !name.endsWith('.fbx')) {
+        return { valid: false, message: 'Must be a .glb or .fbx file' };
+      }
     }
     if (type === 'usdz' && !file.name.toLowerCase().endsWith('.usdz')) {
-         return { valid: false, message: 'Must be a .usdz file' };
+      return { valid: false, message: 'Must be a .usdz file' };
     }
 
     return { valid: true, message: 'Valid file' };
   };
 
-  const handleFileChange = (type, e) => {
+  const convertFbxToGlb = (file) => {
+    return new Promise((resolve, reject) => {
+      setIsConverting(true);
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const loader = new FBXLoader();
+        // Create blob URL for the loader
+        const blob = new Blob([e.target.result]);
+        const url = URL.createObjectURL(blob);
+
+        loader.load(url, (object) => {
+          // Center and normalize
+          const box = new THREE.Box3().setFromObject(object);
+          const center = box.getCenter(new THREE.Vector3());
+          object.position.sub(center);
+
+          // Export to GLB
+          const exporter = new GLTFExporter();
+          exporter.parse(
+            object,
+            (gltf) => {
+              const glbBlob = new Blob([gltf], { type: 'application/octet-stream' });
+              const glbFile = new File([glbBlob], file.name.replace(/\.fbx$/i, '.glb'), { type: 'application/octet-stream' });
+              URL.revokeObjectURL(url);
+              resolve(glbFile);
+            },
+            (error) => {
+              URL.revokeObjectURL(url);
+              reject(error);
+            },
+            { binary: true }
+          );
+        }, undefined, (error) => {
+          URL.revokeObjectURL(url);
+          reject(error);
+        });
+      };
+
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const handleFileChange = async (type, e) => {
     const file = e.target.files[0];
     if (file) {
       const result = validateFile(type, file);
-      setValidation(prev => ({ ...prev, [type]: result }));
-      setFiles(prev => ({ ...prev, [type]: file }));
-      
+
       if (!result.valid) {
+        setValidation(prev => ({ ...prev, [type]: result }));
         toast({
           title: "Validation Error",
           description: result.message,
           variant: "destructive",
         });
+        return;
+      }
+
+      // Handle FBX conversion logic
+      if (type === 'glb' && file.name.toLowerCase().endsWith('.fbx')) {
+        try {
+          toast({ title: "Iniciando Conversión", description: "Procesando FBX a GLB..." });
+          const glbFile = await convertFbxToGlb(file);
+
+          setFiles(prev => ({ ...prev, [type]: glbFile }));
+          setValidation(prev => ({ ...prev, [type]: { valid: true, message: 'Converted to GLB' } }));
+          toast({ title: "Conversión Completa", description: "Archivo convertido exitosamente." });
+        } catch (error) {
+          console.error("FBX Conversion failed:", error);
+          setValidation(prev => ({ ...prev, [type]: { valid: false, message: 'Conversion failed' } }));
+          toast({ title: "Error", description: "No se pudo convertir el archivo FBX.", variant: "destructive" });
+        } finally {
+          setIsConverting(false);
+        }
+      } else {
+        // Normal GLB or USDZ
+        setFiles(prev => ({ ...prev, [type]: file }));
+        setValidation(prev => ({ ...prev, [type]: result }));
       }
     }
   };
@@ -49,13 +124,14 @@ function UploadModelDialog({ open, onOpenChange, onSubmit }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!files.glb) {
-        toast({ title: "Missing File", description: "GLB file is required", variant: "destructive" });
-        return;
+      toast({ title: "Missing File", description: "GLB/FBX file is required", variant: "destructive" });
+      return;
     }
     if (validation.glb?.valid === false || validation.usdz?.valid === false) return;
+    if (isConverting) return;
 
     setIsSubmitting(true);
-    
+
     // Pass raw files to parent to handle upload logic
     const modelData = {
       name,
@@ -64,13 +140,13 @@ function UploadModelDialog({ open, onOpenChange, onSubmit }) {
     };
 
     try {
-        await onSubmit(modelData, files);
-        setName('');
-        setDescription('');
-        setFiles({ glb: null, usdz: null });
-        setValidation({ glb: null, usdz: null });
+      await onSubmit(modelData, files);
+      setName('');
+      setDescription('');
+      setFiles({ glb: null, usdz: null });
+      setValidation({ glb: null, usdz: null });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -112,17 +188,19 @@ function UploadModelDialog({ open, onOpenChange, onSubmit }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              GLB File (Android/Web) *
+            <label className="block text-sm font-medium text-gray-300 mb-2 flex justify-between">
+              <span>Model File (GLB / FBX) *</span>
+              {isConverting && <span className="text-[#29B6F6] flex items-center text-xs gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Converting FBX...</span>}
             </label>
             <div className="relative">
               <input
                 type="file"
-                accept=".glb"
+                accept=".glb,.fbx"
                 onChange={(e) => handleFileChange('glb', e)}
-                className="w-full bg-[#0B0F14] border border-[#29B6F6]/20 rounded px-3 py-2 text-white file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-[#29B6F6] file:text-[#0B0F14] hover:file:bg-[#29B6F6]/90 file:cursor-pointer"
+                disabled={isConverting}
+                className="w-full bg-[#0B0F14] border border-[#29B6F6]/20 rounded px-3 py-2 text-white file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-[#29B6F6] file:text-[#0B0F14] hover:file:bg-[#29B6F6]/90 file:cursor-pointer disabled:opacity-50"
               />
-              {validation.glb && (
+              {validation.glb && !isConverting && (
                 <div className="absolute right-2 top-1/2 -translate-y-1/2">
                   {validation.glb.valid ? (
                     <CheckCircle className="h-5 w-5 text-green-500" />
@@ -132,6 +210,9 @@ function UploadModelDialog({ open, onOpenChange, onSubmit }) {
                 </div>
               )}
             </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Supports standard .GLB files or .FBX (auto-converted)
+            </p>
           </div>
 
           <div>
@@ -163,17 +244,17 @@ function UploadModelDialog({ open, onOpenChange, onSubmit }) {
               type="button"
               onClick={() => onOpenChange(false)}
               variant="outline"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isConverting}
               className="border-[#29B6F6]/20 text-gray-300 hover:bg-[#29B6F6]/10"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isConverting}
               className="bg-[#29B6F6] hover:bg-[#29B6F6]/90 text-[#0B0F14]"
             >
-              {isSubmitting ? 'Uploading...' : 'Upload Model'}
+              {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Uploading...</> : 'Upload Model'}
             </Button>
           </div>
         </form>

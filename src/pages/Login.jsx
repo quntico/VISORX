@@ -7,11 +7,13 @@ import { Box as Cube, Shield, Zap, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 function Login() {
   const { signInWithGoogle, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   useEffect(() => {
     // Check for error in URL hash (from OAuth redirect)
@@ -20,12 +22,12 @@ function Login() {
       const params = new URLSearchParams(hash.substring(1));
       const errorDescription = params.get('error_description');
       const errorCode = params.get('error_code');
-      
+
       console.error('[AuthDebug] URL Hash Error:', errorDescription, errorCode);
-      
+
       if (errorDescription) {
         toast({
-          title: "Authentication Error",
+          title: t('auth.errorTitle'),
           description: errorDescription.replace(/\+/g, ' '),
           variant: "destructive"
         });
@@ -36,7 +38,7 @@ function Login() {
       console.log('[AuthDebug] Login page detected user, redirecting to dashboard');
       navigate('/dashboard');
     }
-  }, [user, loading, navigate, toast]);
+  }, [user, loading, navigate, toast, t]);
 
   const handleLoginClick = () => {
     console.log('[AuthDebug] Login button clicked');
@@ -49,7 +51,7 @@ function Login() {
         <title>Login - VISOR-X</title>
         <meta name="description" content="Sign in to VISOR-X" />
       </Helmet>
-      
+
       <div className="min-h-screen bg-[#0B0F14] flex items-center justify-center p-4 relative overflow-hidden">
         {/* Background Grid */}
         <div className="absolute inset-0 opacity-10">
@@ -96,20 +98,43 @@ function Login() {
 
             <div className="space-y-6">
               <div className="text-center">
-                <h2 className="text-xl font-semibold text-white mb-2">Welcome Back</h2>
-                <p className="text-sm text-gray-400">Sign in to manage your projects</p>
+                <h2 className="text-xl font-semibold text-white mb-2">{t('auth.loginTitle')}</h2>
+                <p className="text-sm text-gray-400">{t('auth.loginSubtitle')}</p>
               </div>
 
               <Button
+                className="w-full bg-white text-gray-900 hover:bg-gray-100 font-semibold h-12"
                 onClick={handleLoginClick}
-                className="w-full bg-white hover:bg-gray-100 text-gray-900 font-medium h-12 flex items-center justify-center gap-3 transition-all"
               >
-                <img 
-                  src="https://www.google.com/favicon.ico" 
-                  alt="Google" 
-                  className="w-5 h-5"
+                <img
+                  src="https://www.google.com/favicon.ico"
+                  alt="Google"
+                  className="w-5 h-5 mr-3"
                 />
-                Sign in with Google
+                {t('auth.signInButton')}
+              </Button>
+
+              {/* Dev Bypass Button */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-white/10" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-[#151B23] px-2 text-gray-500">Dev Options</span>
+                </div>
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 h-10 text-xs"
+                onClick={() => {
+                  // Hack to bypass auth for testing
+                  const fakeUser = { id: 'dev-user', email: 'dev@local.host', role: 'admin' };
+                  localStorage.setItem('visorx_user', JSON.stringify(fakeUser));
+                  window.location.href = '/dashboard';
+                }}
+              >
+                ⚡ Acceso Rápido (Modo Pruebas)
               </Button>
 
               <div className="bg-[#29B6F6]/10 border border-[#29B6F6]/20 rounded p-3 flex items-start gap-3">
