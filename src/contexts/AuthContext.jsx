@@ -125,7 +125,13 @@ export function AuthProvider({ children }) {
         // localStorage.setItem('visorx_mode', 'simulation'); // REMOVED
       } finally {
         clearTimeout(timeoutId);
-        setLoading(false);
+        // If we have a hash with access_token, we might be in the middle of a redirect flow.
+        // Let onAuthStateChange handle the final loading state to avoid premature PrivateRoute redirection.
+        if (!window.location.hash.includes('access_token')) {
+          setLoading(false);
+        } else {
+          console.log('[AuthDebug] Auth hash detected, keeping loading true for onAuthStateChange to resolve.');
+        }
       }
     };
 
@@ -138,9 +144,10 @@ export function AuthProvider({ children }) {
       // But we should update state if real auth happens
       if (session?.user) {
         setUser(session.user);
-        fetchProfile(session.user);
+        await fetchProfile(session.user);
         localStorage.removeItem('visorx_mode'); // Exit simulation mode if real login happens
       }
+      setLoading(false); // Ensure loading is cleared after auth check
     });
 
     return () => {
@@ -158,11 +165,8 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      // Use origin only. Let PrivateRoute handle the forwarding to dashboard.
-      // If we force /dashboard here, it might conflict if Supabase expects a different callback.
-      // Usually Supabase handles the callback and then we redirect.
-      // Redirect directly to dashboard to avoid Router stripping hashtags at root
-      const redirectUrl = window.location.origin + '/dashboard';
+      // Use origin only. Let App router handle the default forwarding to dashboard.
+      const redirectUrl = window.location.origin;
       console.log('[AuthDebug] Starting OAuth flow. Redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
