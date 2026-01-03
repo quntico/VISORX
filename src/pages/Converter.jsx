@@ -1083,13 +1083,26 @@ function Converter() {
             return;
         }
 
-        // Ensure user is present (refresh session if needed)
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) {
-            toast({ title: "Error de Sesión", description: "Tu sesión ha expirado. Recarga la página.", variant: "destructive" });
+        // Validate Project Selection if projects exist
+        if (projects.length > 0 && !saveData.projectId) {
+            toast({ title: "Falta Proyecto", description: "Por favor selecciona un proyecto de la lista.", variant: "destructive" });
             return;
         }
-        const currentUser = session.user;
+
+        // Ensure user is present (refresh session if needed)
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user) {
+                toast({ title: "Error de Sesión", description: "Tu sesión ha expirado. Recarga la página.", variant: "destructive" });
+                return;
+            }
+            // Use local scope currentUser to ensure we have the ID
+            var currentUser = session.user;
+        } catch (authErr) {
+            console.error("Auth check failed:", authErr);
+            toast({ title: "Error de Autenticación", description: "No se pudo verificar tu sesión.", variant: "destructive" });
+            return;
+        }
 
         setShowSaveDialog(false);
         setLoading(true);
@@ -2022,7 +2035,7 @@ function Converter() {
                         </Button>
                         <Button
                             onClick={confirmSaveToProject}
-                            disabled={!saveData.name || loading || !isSupabaseConfigured() || (projects.length > 0 && !saveData.projectId)}
+                            disabled={!saveData.name || loading}
                             className="bg-[#29B6F6] text-[#0B0F14] hover:bg-[#29B6F6]/90"
                         >
                             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
