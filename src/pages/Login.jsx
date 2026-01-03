@@ -130,12 +130,19 @@ function Login() {
                 variant="outline"
                 className="w-full border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 h-10 text-xs"
                 onClick={() => {
-                  // Activate Simulation Mode
+                  // Activate Simulation Mode AND Local User
                   localStorage.setItem('visorx_mode', 'simulation');
+                  localStorage.setItem('visorx_user', JSON.stringify({
+                    id: 'dev_user',
+                    email: 'demo@visorx.com',
+                    role: 'admin',
+                    app_metadata: {},
+                    user_metadata: { full_name: 'Evaluador' }
+                  }));
                   window.location.reload();
                 }}
               >
-                ⚡ Acceso Rápido (Modo Pruebas)
+                ⚡ Acceso Rápido (Bypass Login)
               </Button>
 
               <div className="bg-[#29B6F6]/10 border border-[#29B6F6]/20 rounded p-3 flex items-start gap-3">
@@ -146,14 +153,14 @@ function Login() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </motion.div >
 
         {/* DIAGNOSTICS PANEL (New) */}
-        <div className="fixed bottom-4 left-4 right-4 z-50">
+        < div className="fixed bottom-4 left-4 right-4 z-50" >
           <DiagnosticsPanel />
-        </div>
+        </div >
 
-      </div>
+      </div >
     </>
   );
 }
