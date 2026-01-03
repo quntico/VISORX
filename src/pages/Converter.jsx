@@ -7,7 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { projectsService, modelsService, storageService } from '@/lib/data-service';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -30,9 +30,7 @@ import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter'; // For
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
 import { TGALoader } from 'three/examples/jsm/loaders/TGALoader';
 import JSZip from 'jszip'; // For ZIP support
-import { projectsService, modelsService, storageService } from '@/lib/data-service';
-import { isSupabaseConfigured } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
+
 
 
 function Converter() {
