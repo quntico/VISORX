@@ -69,14 +69,14 @@ export const projectsService = {
       return createMockProject(project);
     }
 
-    // 2. Check Real Auth
-    const { data: { user } } = await supabase.auth.getUser();
+    // 2. Check Real Auth (Use getSession for better reliability)
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
 
     // 3. Fallback to Mock if no real user (Simulation Mode Auto-Failover)
-    // 3. Fallback to Mock if no real user (Simulation Mode Auto-Failover)
     if (!user) {
-      console.error("No authenticated user found for project creation.");
-      throw new Error("Usuario no autenticado. Inicia sesión nuevamente.");
+      console.error("No authenticated session found for project creation.");
+      throw new Error("Sesión expirada. Por favor recarga la página o inicia sesión.");
     }
 
     const { data, error } = await supabase

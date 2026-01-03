@@ -85,6 +85,16 @@ function Converter() {
 
     const loadAllData = async () => {
         try {
+            console.log("Debug: Starting loadAllData...");
+
+            // Check session first
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                console.warn("Debug: No active session found during loadAllData");
+            } else {
+                console.log("Debug: Active session found for user:", session.user.email);
+            }
+
             // Parallel Fetching for Speed using the new getAll method
             const [projs, allModels] = await Promise.all([
                 projectsService.getAll(),
@@ -98,12 +108,13 @@ function Converter() {
             }
 
             console.log(`Debug: User ${user?.id} found ${projs.length} projects, ${allModels.length} models`);
+            // console.log("Debug: Models List:", allModels);
 
             // Explicit feedback for debugging
             toast({
                 title: "Librería Actualizada",
-                description: `Encontrados: ${allModels.length} modelos en ${projs.length} proyectos.`,
-                variant: "default" // Always default/blue, red is too alarming for empty library
+                description: `Encontrados: ${allModels.length} modelos.`,
+                variant: "default"
             });
         } catch (e) {
             console.error("Error loading library:", e);
