@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { projectsService, modelsService, storageService } from '@/lib/data-service';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
     Dialog,
@@ -785,7 +787,7 @@ function Converter() {
             // Handle both standard paths and encoded URIs if necessary
             const fileName = url.replace(/^.*[\\\/]/, '').toLowerCase();
 
-            console.log(`[Manager] Requesting: ${url} -> Clean: ${fileName}`);
+            console.log(`[Manager] Requesting: ${url} -> Clean: ${fileName} `);
 
             // Allow matching cleaned name
             if (textureMap.has(fileName)) {
@@ -796,13 +798,13 @@ function Converter() {
                 try {
                     const decoded = decodeURIComponent(fileName);
                     if (textureMap.has(decoded)) {
-                        console.log(`[Manager] HIT (Decoded): Used blob for ${decoded}`);
+                        console.log(`[Manager] HIT(Decoded): Used blob for ${decoded}`);
                         return textureMap.get(decoded);
                     }
                 } catch (e) { }
             }
 
-            console.log(`[Manager] MISS: ${fileName}`);
+            console.log(`[Manager] MISS: ${fileName} `);
             return url;
         });
 
@@ -810,7 +812,7 @@ function Converter() {
             if (xhr.lengthComputable) {
                 const percent = (xhr.loaded / xhr.total) * 100;
                 setProgress(Math.round(percent));
-                setUploadStatus(`Cargando modelo... ${Math.round(percent)}%`);
+                setUploadStatus(`Cargando modelo... ${Math.round(percent)}% `);
             }
         };
 
@@ -836,10 +838,10 @@ function Converter() {
 
                             // Debug Textures
                             if (child.material.map) {
-                                console.log(`Found texture map on mesh: ${child.name}`, child.material.map);
+                                console.log(`Found texture map on mesh: ${child.name} `, child.material.map);
                                 child.material.map.encoding = THREE.sRGBEncoding; // Ensure color correctness
                             } else {
-                                // console.log(`No texture map on mesh: ${child.name}`);
+                                // console.log(`No texture map on mesh: ${ child.name } `);
                             }
 
                             // Ensure standard material for better light
@@ -1112,12 +1114,12 @@ function Converter() {
 
             setProgress(60);
 
-            const fileName = `${saveData.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${Date.now()}.glb`;
+            const fileName = `${saveData.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()} -${Date.now()}.glb`;
             const file = new File([blob], fileName, { type: 'application/octet-stream' });
 
             // 2. Upload to Supabase Storage
             // 2. Upload to Supabase Storage
-            const publicUrl = await storageService.uploadFile('models', `${user.id}/${targetProjectId}/${fileName}`, file);
+            const publicUrl = await storageService.uploadFile('models', `${user.id} /${targetProjectId}/${fileName} `, file);
 
             // 2.5 Generate & Upload Thumbnail (Best Effort)
             try {
@@ -1131,7 +1133,7 @@ function Converter() {
                     const thumbBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.5));
                     if (thumbBlob) {
                         const thumbName = fileName.replace(/\.[^/.]+$/, "") + ".png";
-                        await storageService.uploadFile('models', `${user.id}/${targetProjectId}/${thumbName}`, thumbBlob);
+                        await storageService.uploadFile('models', `${user.id} /${targetProjectId}/${thumbName} `, thumbBlob);
                     }
                 }
             } catch (thumbErr) {
@@ -1193,14 +1195,14 @@ function Converter() {
             setUploadStatus("Subiendo archivo a la nube... " + (file.size / (1024 * 1024)).toFixed(0) + "MB");
 
             // Upload Raw File
-            const fileName = `${file.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`;
+            const fileName = `${file.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()} `;
 
             const onUploadProgress = (pc) => {
                 setProgress(Math.round(pc));
                 setUploadStatus(`Subiendo archivo a la nube... ${Math.round(pc)}% (${(file.size / (1024 * 1024)).toFixed(0)}MB)`);
             };
 
-            const publicUrl = await storageService.uploadFile('models', `${user.id}/${targetProjectId}/${fileName}`, file, onUploadProgress);
+            const publicUrl = await storageService.uploadFile('models', `${user.id} /${targetProjectId}/${fileName} `, file, onUploadProgress);
 
             setProgress(95);
             setUploadStatus("Registrando modelo en base de datos...");
@@ -1521,7 +1523,8 @@ function Converter() {
                                         transform: `scale(${Math.min(
                                             (imgContainerRef.current?.clientWidth - 100) / imgTargetDims.width || 1,
                                             (imgContainerRef.current?.clientHeight - 100) / imgTargetDims.height || 1
-                                        )})`
+                                        )
+                                            })`
                                     }}
                                 >
                                     <canvas ref={canvasRef} width={imgTargetDims.width} height={imgTargetDims.height} className="block" />
@@ -1579,10 +1582,10 @@ function Converter() {
                             )}
 
                             <aside className={`
-                                fixed inset-y-0 right-0 z-50 w-72 bg-[#151B23] border-l border-white/10 flex flex-col shadow-2xl transition-transform duration-300
-                                md:relative md:w-64 md:translate-x-0 md:shadow-none
+                                fixed inset - y - 0 right - 0 z - 50 w - 72 bg - [#151B23] border - l border - white / 10 flex flex - col shadow - 2xl transition - transform duration - 300
+md:relative md: w - 64 md: translate - x - 0 md: shadow - none
                                 ${showControls ? 'translate-x-0' : 'translate-x-full md:hidden'}
-                            `}>
+`}>
                                 <div className="p-4 border-b border-white/10 flex justify-between items-center">
                                     <h3 className="text-xs font-bold text-[#29B6F6] uppercase flex items-center gap-2">
                                         <Settings className="h-3 w-3" /> Control de Modelo
@@ -1604,9 +1607,9 @@ function Converter() {
                                             <label className="text-xs text-white font-medium">Efecto RX (Wireframe)</label>
                                             <div
                                                 onClick={() => setIsRxMode(!isRxMode)}
-                                                className={`w-10 h-5 rounded-full flex items-center p-1 cursor-pointer transition-colors ${isRxMode ? 'bg-[#29B6F6]' : 'bg-gray-700'}`}
+                                                className={`w - 10 h - 5 rounded - full flex items - center p - 1 cursor - pointer transition - colors ${isRxMode ? 'bg-[#29B6F6]' : 'bg-gray-700'} `}
                                             >
-                                                <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${isRxMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                                                <div className={`w - 3 h - 3 bg - white rounded - full shadow - md transform transition - transform ${isRxMode ? 'translate-x-5' : 'translate-x-0'} `} />
                                             </div>
                                         </div>
                                         <p className="text-[10px] text-gray-500">Muestra la estructura geométrica del modelo.</p>
@@ -1700,9 +1703,9 @@ function Converter() {
                                             <label className="text-xs text-white font-medium">Animación (Giro)</label>
                                             <div
                                                 onClick={() => setIsAutoRotate(!isAutoRotate)}
-                                                className={`w-10 h-5 rounded-full flex items-center p-1 cursor-pointer transition-colors ${isAutoRotate ? 'bg-green-500' : 'bg-gray-700'}`}
+                                                className={`w - 10 h - 5 rounded - full flex items - center p - 1 cursor - pointer transition - colors ${isAutoRotate ? 'bg-green-500' : 'bg-gray-700'} `}
                                             >
-                                                <div className={`h-3 w-3 rounded-full bg-white shadow-sm transform transition-transform ${isAutoRotate ? 'translate-x-5' : 'translate-x-0'}`} />
+                                                <div className={`h - 3 w - 3 rounded - full bg - white shadow - sm transform transition - transform ${isAutoRotate ? 'translate-x-5' : 'translate-x-0'} `} />
                                             </div>
                                         </div>
 
@@ -1714,7 +1717,7 @@ function Converter() {
                                                         size="sm"
                                                         variant={rotationAxis === axis ? "secondary" : "ghost"}
                                                         onClick={() => setRotationAxis(axis)}
-                                                        className={`flex-1 text-xs h-7 ${rotationAxis === axis ? 'bg-[#29B6F6] text-black' : 'text-gray-400 border border-white/10'}`}
+                                                        className={`flex - 1 text - xs h - 7 ${rotationAxis === axis ? 'bg-[#29B6F6] text-black' : 'text-gray-400 border border-white/10'} `}
                                                     >
                                                         Eje {axis.toUpperCase()}
                                                     </Button>
@@ -1846,7 +1849,7 @@ function Converter() {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className={`h-10 w-10 rounded-full bg-white/5 ${showControls ? 'text-[#29B6F6] bg-[#29B6F6]/10' : 'text-white'}`}
+                            className={`h - 10 w - 10 rounded - full bg - white / 5 ${showControls ? 'text-[#29B6F6] bg-[#29B6F6]/10' : 'text-white'} `}
                             onClick={() => setShowControls(!showControls)}
                         >
                             <Settings className="h-5 w-5" />
@@ -1859,7 +1862,7 @@ function Converter() {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className={`h-10 w-10 rounded-full bg-white/5 ${showMobileLibrary ? 'text-[#29B6F6]' : 'text-white'}`}
+                                className={`h - 10 w - 10 rounded - full bg - white / 5 ${showMobileLibrary ? 'text-[#29B6F6]' : 'text-white'} `}
                                 onClick={() => {
                                     setShowMobileLibrary(true);
                                     loadAllData(); // Refresh on open
@@ -2099,7 +2102,7 @@ function MobileLibraryOverlay({ open, onClose, models, onLoadModel, onDeleteMode
                         className="rounded-full h-8 w-8 bg-white/10 text-white active:bg-[#29B6F6] active:text-black"
                         title="Actualizar"
                     >
-                        <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                        <RotateCw className={`h - 4 w - 4 ${loading ? 'animate-spin' : ''} `} />
                     </Button>
                     <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full h-8 w-8 bg-white/10 text-white">
                         <X className="h-5 w-5" />
