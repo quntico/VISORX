@@ -289,7 +289,8 @@ export const publicLinksService = {
 export const storageService = {
   async uploadFile(bucket, path, file, onProgress) {
     const runMockObj = () => {
-      // Convert File to Data URL to store in "DB" (Not efficient but works for simulation)
+      // Use Blob URL instead of Data URL to avoid localStorage quota limits
+      // This is crucial for large GLB files in "Test Mode"
       return new Promise((resolve) => {
         let progress = 0;
         const interval = setInterval(() => {
@@ -297,9 +298,9 @@ export const storageService = {
           if (onProgress) onProgress(progress);
           if (progress >= 100) {
             clearInterval(interval);
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.readAsDataURL(file);
+            // Return ephemeral URL. Works perfectly for current session.
+            const blobUrl = URL.createObjectURL(file);
+            resolve(blobUrl);
           }
         }, 100);
       });
