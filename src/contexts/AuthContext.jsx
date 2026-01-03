@@ -138,26 +138,47 @@ export function AuthProvider({ children }) {
     initSession();
 
     // Listen for changes
+    // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`[AuthDebug] Auth State Change: ${event}`);
+
+      const hasAuthHash = window.location.hash && window.location.hash.includes('access_token');
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
           setUser(session.user);
           await fetchProfile(session.user);
           localStorage.removeItem('visorx_mode');
+
           // Force reload if we were stuck
           if (window.location.pathname === '/login') {
             window.location.href = '/dashboard';
             return;
           }
         }
+        setLoading(false); // Success!
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setRole(null);
+        setLoading(false);
+      } else if (event === 'INITIAL_SESSION') {
+        // CRITICAL FIX: If we have a hash, do NOT accept "null" session yet.
+        // Wait for SIGNED_IN.
+        if (hasAuthHash && !session) {
+          console.log('[AuthDebug] INITIAL_SESSION with hash detected. Ignoring null session to wait for SIGNED_IN.');
+          return;
+        }
+        // Otherwise, standard init
+        if (session?.user) {
+          setUser(session.user);
+          await fetchProfile(session.user);
+        }
+        setLoading(false);
+      } else {
+        // Password recovery, etc.
+        setLoading(false);
       }
 
-      setLoading(false);
       clearTimeout(timeoutId);
     });
 
