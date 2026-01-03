@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
 
@@ -12,6 +12,9 @@ export function AuthProvider({ children }) {
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  // Ref to track if we are manually processing a hash to prevent race conditions
+  const processingHash = useRef(false);
 
   const fetchProfile = async (sessionUser) => {
     if (!sessionUser) {
@@ -70,7 +73,7 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // SAFETY VALVE: Force stop loading after 6 seconds no matter what
+    // SAFETY VALVE: Force stop loading after 8 seconds no matter what
     const safetyTimeout = setTimeout(() => {
       setLoading(prev => {
         if (prev) {
@@ -79,7 +82,7 @@ export function AuthProvider({ children }) {
         }
         return prev;
       });
-    }, 6000);
+    }, 8000);
 
     // Initialize session
     const initAuth = async () => {
@@ -95,10 +98,11 @@ export function AuthProvider({ children }) {
         }
 
         // 2. Manual Token Recovery (Robust Fallback)
-        // If Supabase auto-detect fails, we manually process the hash
         const hash = window.location.hash;
         if (hash && hash.includes('access_token')) {
+          processingHash.current = true;
           console.log('[Auth] Detected OAuth hash. Attempting manual session recovery...');
+
           const params = new URLSearchParams(hash.substring(1));
           const accessToken = params.get('access_token');
           const refreshToken = params.get('refresh_token');
@@ -117,15 +121,18 @@ export function AuthProvider({ children }) {
 
               // Clean URL and redirect
               window.location.hash = '';
+              // Force navigation only if on login page
               if (window.location.pathname === '/login') {
                 window.location.href = '/dashboard';
               }
+              processingHash.current = false;
               return;
             }
           }
+          processingHash.current = false;
         }
 
-        // 3. Standard Session Check
+        // 3. Standard Session Check (Only if manual recovery didn't finish)
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session?.user) {
@@ -135,7 +142,10 @@ export function AuthProvider({ children }) {
       } catch (error) {
         console.error('[Auth] Init error:', error);
       } finally {
-        setLoading(false);
+        // ONLY set loading to false if we are NOT currently processing a hash
+        if (!processingHash.current) {
+          setLoading(false);
+        }
       }
     };
 
@@ -145,13 +155,18 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[Auth] State change:', event);
 
+      // Ignore SIGNED_OUT events if we are manually processing a token
+      if (processingHash.current && event === 'SIGNED_OUT') {
+        console.log('[Auth] Ignoring SIGNED_OUT during manual token processing');
+        return;
+      }
+
       if (event === 'SIGNED_IN') {
         if (session?.user) {
           setUser(session.user);
           await fetchProfile(session.user);
           localStorage.removeItem('visorx_mode');
 
-          // Redirect to dashboard if on login page
           if (window.location.pathname === '/login') {
             window.location.href = '/dashboard';
           }
@@ -161,12 +176,12 @@ export function AuthProvider({ children }) {
         setRole(null);
       }
 
-      // Always clear loading on state change
       setLoading(false);
     });
 
     return () => {
       subscription.unsubscribe();
+      clearTimeout(safetyTimeout);
     };
   }, []);
 
