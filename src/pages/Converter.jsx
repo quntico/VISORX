@@ -701,11 +701,12 @@ function Converter() {
     };
 
     // Apply Y Position
+    // Apply Y Position (Keep persistent on load)
     useEffect(() => {
         if (modelObject) {
-            modelObject.position.y = modelY;
+            modelObject.position.y = verticalPos;
         }
-    }, [modelY, modelObject]);
+    }, [verticalPos, modelObject]);
 
     // DRAG & DROP HANDLERS
     const handleDragOver = (e) => {
