@@ -16,6 +16,18 @@ export function AuthProvider({ children }) {
   // Ref to track if we are manually processing a hash to prevent race conditions
   const processingHash = useRef(false);
 
+  // Helper for persistent logging
+  const logAuth = (msg) => {
+    const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
+    const log = `[${timestamp}] ${msg}`;
+    console.log(log);
+    try {
+      const history = JSON.parse(localStorage.getItem('auth_debug_log') || '[]');
+      history.unshift(log); // Add to top
+      localStorage.setItem('auth_debug_log', JSON.stringify(history.slice(0, 50)));
+    } catch (e) { console.error('Log error', e); }
+  };
+
   const fetchProfile = async (sessionUser) => {
     if (!sessionUser) {
       setRole(null);
@@ -30,11 +42,12 @@ export function AuthProvider({ children }) {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('[Auth] Error fetching profile:', error);
+        logAuth(`Error fetching profile: ${error.message}`);
       }
 
       // Auto-create profile if missing
       if (!profile) {
+        logAuth('Profile missing. Creating new profile...');
         const newRole = sessionUser.email === 'delavega3540@gmail.com' ? 'admin' : 'user';
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
@@ -48,6 +61,9 @@ export function AuthProvider({ children }) {
 
         if (!insertError) {
           profile = newProfile;
+          logAuth('Profile created successfully.');
+        } else {
+          logAuth(`Error creating profile: ${insertError.message}`);
         }
       }
 
@@ -55,7 +71,7 @@ export function AuthProvider({ children }) {
         setRole(profile.role);
       }
     } catch (error) {
-      console.error("[Auth] Unexpected error in fetchProfile:", error);
+      logAuth(`Unexpected error in fetchProfile: ${error.message}`);
     }
   };
 
@@ -77,7 +93,7 @@ export function AuthProvider({ children }) {
     const safetyTimeout = setTimeout(() => {
       setLoading(prev => {
         if (prev) {
-          console.warn('[Auth] Safety timeout triggered. Forcing loading=false.');
+          logAuth('SAFETY TIMEOUT: Forcing loading=false (8s expired)');
           return false;
         }
         return prev;
@@ -87,9 +103,12 @@ export function AuthProvider({ children }) {
     // Initialize session
     const initAuth = async () => {
       try {
+        logAuth('Auth Init Started');
+
         // 1. Check for local dev user first
         const storedUser = localStorage.getItem('visorx_user');
         if (storedUser) {
+          logAuth('Found local dev user in localStorage');
           const parsed = JSON.parse(storedUser);
           setUser(parsed);
           setRole(parsed.role || 'user');
@@ -100,8 +119,8 @@ export function AuthProvider({ children }) {
         // 2. Manual Token Recovery (Robust Fallback)
         const hash = window.location.hash;
         if (hash && hash.includes('access_token')) {
+          logAuth('Hash detected containing access_token');
           processingHash.current = true;
-          console.log('[Auth] Detected OAuth hash. Attempting manual session recovery...');
 
           const params = new URLSearchParams(hash.substring(1));
           const accessToken = params.get('access_token');
@@ -113,8 +132,12 @@ export function AuthProvider({ children }) {
               refresh_token: refreshToken || ''
             });
 
+            if (error) {
+              logAuth(`setSession FAILED: ${error.message}`);
+            }
+
             if (!error && session?.user) {
-              console.log('[Auth] Manual session recovery successful.');
+              logAuth('Manual setSession SUCCESS. User established.');
               setUser(session.user);
               await fetchProfile(session.user);
               setLoading(false);
@@ -123,6 +146,7 @@ export function AuthProvider({ children }) {
               window.location.hash = '';
               // Force navigation only if on login page
               if (window.location.pathname === '/login') {
+                logAuth('Redirecting to dashboard from login page...');
                 window.location.href = '/dashboard';
               }
               processingHash.current = false;
@@ -130,21 +154,30 @@ export function AuthProvider({ children }) {
             }
           }
           processingHash.current = false;
+        } else {
+          logAuth('No access_token in hash.');
         }
 
         // 3. Standard Session Check (Only if manual recovery didn't finish)
+        logAuth('Checking standard supabase.auth.getSession()...');
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session?.user) {
+          logAuth(`Standard getSession FOUND user: ${session.user.email}`);
           setUser(session.user);
           await fetchProfile(session.user);
+        } else {
+          logAuth('Standard getSession returned NO user.');
         }
       } catch (error) {
-        console.error('[Auth] Init error:', error);
+        logAuth(`Init CRITICAL ERROR: ${error.message}`);
       } finally {
         // ONLY set loading to false if we are NOT currently processing a hash
         if (!processingHash.current) {
+          logAuth('Setting loading = false (Init complete)');
           setLoading(false);
+        } else {
+          logAuth('Keeping loading = true (Hash processing in progress)');
         }
       }
     };
@@ -153,25 +186,28 @@ export function AuthProvider({ children }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[Auth] State change:', event);
+      logAuth(`Supabase Event: ${event}`);
 
       // Ignore SIGNED_OUT events if we are manually processing a token
       if (processingHash.current && event === 'SIGNED_OUT') {
-        console.log('[Auth] Ignoring SIGNED_OUT during manual token processing');
+        logAuth('IGNORING SIGNED_OUT event due to active hash processing lock');
         return;
       }
 
       if (event === 'SIGNED_IN') {
         if (session?.user) {
+          logAuth(`SIGNED_IN event with user: ${session.user.email}`);
           setUser(session.user);
           await fetchProfile(session.user);
           localStorage.removeItem('visorx_mode');
 
           if (window.location.pathname === '/login') {
+            logAuth('Redirecting to /dashboard from SIGNED_IN event');
             window.location.href = '/dashboard';
           }
         }
       } else if (event === 'SIGNED_OUT') {
+        logAuth('SIGNED_OUT event processed. Clearing user state.');
         setUser(null);
         setRole(null);
       }
@@ -186,6 +222,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signInWithGoogle = async () => {
+    logAuth('User clicked SignInWithGoogle');
     if (!supabase) {
       toast({ title: "Demo Mode", description: "Google Auth requires Supabase connection." });
       return;
@@ -201,12 +238,14 @@ export function AuthProvider({ children }) {
 
       if (error) throw error;
     } catch (error) {
+      logAuth(`SignIn ERROR: ${error.message}`);
       console.error('[Auth] Login error:', error);
       toast({ title: "Login Failed", description: error.message, variant: "destructive" });
     }
   };
 
   const signOut = async () => {
+    logAuth('User clicked SignOut');
     try {
       localStorage.removeItem('visorx_user');
       localStorage.removeItem('visorx_mode');
