@@ -13,17 +13,15 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Ref to track if we are manually processing a hash to prevent race conditions
   const processingHash = useRef(false);
 
-  // Helper for persistent logging
   const logAuth = (msg) => {
     const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
     const log = `[${timestamp}] ${msg}`;
     console.log(log);
     try {
       const history = JSON.parse(localStorage.getItem('auth_debug_log') || '[]');
-      history.unshift(log); // Add to top
+      history.unshift(log);
       localStorage.setItem('auth_debug_log', JSON.stringify(history.slice(0, 50)));
     } catch (e) { console.error('Log error', e); }
   };
@@ -45,7 +43,6 @@ export function AuthProvider({ children }) {
         logAuth(`Error fetching profile: ${error.message}`);
       }
 
-      // Auto-create profile if missing
       if (!profile) {
         logAuth('Profile missing. Creating new profile...');
         const newRole = sessionUser.email === 'delavega3540@gmail.com' ? 'admin' : 'user';
@@ -76,9 +73,7 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    // Check if Supabase is configured
     if (!supabase) {
-      // Fallback to local mode
       const storedUser = localStorage.getItem('visorx_user');
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
@@ -89,7 +84,6 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // SAFETY VALVE: Force stop loading after 8 seconds no matter what
     const safetyTimeout = setTimeout(() => {
       setLoading(prev => {
         if (prev) {
@@ -100,12 +94,10 @@ export function AuthProvider({ children }) {
       });
     }, 8000);
 
-    // Initialize session
     const initAuth = async () => {
       try {
-        logAuth('Auth Init Started');
+        logAuth('Auth Init Started (v2.1 - Timeout Fix)');
 
-        // 1. Check for local dev user first
         const storedUser = localStorage.getItem('visorx_user');
         if (storedUser) {
           logAuth('Found local dev user in localStorage');
@@ -116,10 +108,9 @@ export function AuthProvider({ children }) {
           return;
         }
 
-        // 2. Manual Token Recovery (Robust Fallback)
         const hash = window.location.hash;
         if (hash && hash.includes('access_token')) {
-          logAuth('Hash detected containing access_token');
+          logAuth(`Hash detected: ${hash.substring(0, 30)}...`);
           processingHash.current = true;
 
           const params = new URLSearchParams(hash.substring(1));
@@ -127,30 +118,46 @@ export function AuthProvider({ children }) {
           const refreshToken = params.get('refresh_token');
 
           if (accessToken) {
-            const { data: { session }, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken || ''
-            });
+            const tokenPreview = accessToken.substring(0, 10);
+            logAuth(`Extracted token: ${tokenPreview}...`);
+            logAuth('Calling setSession (with 3s timeout)...');
 
-            if (error) {
-              logAuth(`setSession FAILED: ${error.message}`);
-            }
+            try {
+              // Wrap setSession in a race with a timeout
+              const sessionPromise = supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken || ''
+              });
 
-            if (!error && session?.user) {
-              logAuth('Manual setSession SUCCESS. User established.');
-              setUser(session.user);
-              await fetchProfile(session.user);
-              setLoading(false);
+              const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('setSession call timed out')), 3000)
+              );
 
-              // Clean URL and redirect
-              window.location.hash = '';
-              // Force navigation only if on login page
-              if (window.location.pathname === '/login') {
-                logAuth('Redirecting to dashboard from login page...');
-                window.location.href = '/dashboard';
+              const result = await Promise.race([sessionPromise, timeoutPromise]);
+              const { data: { session }, error } = result;
+
+              if (error) {
+                logAuth(`setSession FAILED: ${error.message}`);
               }
-              processingHash.current = false;
-              return;
+
+              if (!error && session?.user) {
+                logAuth(`setSession SUCCESS. User: ${session.user.email}`);
+                setUser(session.user);
+                await fetchProfile(session.user);
+                setLoading(false);
+
+                window.location.hash = '';
+                if (window.location.pathname === '/login') {
+                  logAuth('Redirecting to dashboard...');
+                  window.location.href = '/dashboard';
+                }
+                processingHash.current = false;
+                return;
+              } else {
+                logAuth('setSession returned success but NO session.');
+              }
+            } catch (err) {
+              logAuth(`setSession EXCEPTION: ${err.message}`);
             }
           }
           processingHash.current = false;
@@ -158,7 +165,6 @@ export function AuthProvider({ children }) {
           logAuth('No access_token in hash.');
         }
 
-        // 3. Standard Session Check (Only if manual recovery didn't finish)
         logAuth('Checking standard supabase.auth.getSession()...');
         const { data: { session } } = await supabase.auth.getSession();
 
@@ -172,25 +178,22 @@ export function AuthProvider({ children }) {
       } catch (error) {
         logAuth(`Init CRITICAL ERROR: ${error.message}`);
       } finally {
-        // ONLY set loading to false if we are NOT currently processing a hash
         if (!processingHash.current) {
           logAuth('Setting loading = false (Init complete)');
           setLoading(false);
         } else {
-          logAuth('Keeping loading = true (Hash processing in progress)');
+          logAuth('Keeping loading = true (Hash processing logic active)');
         }
       }
     };
 
     initAuth();
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       logAuth(`Supabase Event: ${event}`);
 
-      // Ignore SIGNED_OUT events if we are manually processing a token
       if (processingHash.current && event === 'SIGNED_OUT') {
-        logAuth('IGNORING SIGNED_OUT event due to active hash processing lock');
+        logAuth('IGNORING SIGNED_OUT due to lock');
         return;
       }
 
@@ -202,12 +205,10 @@ export function AuthProvider({ children }) {
           localStorage.removeItem('visorx_mode');
 
           if (window.location.pathname === '/login') {
-            logAuth('Redirecting to /dashboard from SIGNED_IN event');
             window.location.href = '/dashboard';
           }
         }
       } else if (event === 'SIGNED_OUT') {
-        logAuth('SIGNED_OUT event processed. Clearing user state.');
         setUser(null);
         setRole(null);
       }
