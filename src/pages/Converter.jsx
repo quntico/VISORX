@@ -1089,28 +1089,22 @@ function Converter() {
             return;
         }
 
-        // Ensure user is present (refresh session if needed)
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session?.user) {
-                toast({ title: "Error de Sesión", description: "Tu sesión ha expirado. Recarga la página.", variant: "destructive" });
-                return;
-            }
-            // Use local scope currentUser to ensure we have the ID
-            var currentUser = session.user;
-        } catch (authErr) {
-            console.error("Auth check failed:", authErr);
-            toast({ title: "Error de Autenticación", description: "No se pudo verificar tu sesión.", variant: "destructive" });
+        // Debugging verification
+        console.log("Starting save process...");
+        if (!user) {
+            console.error("No user in context");
+            toast({ title: "Error de Sesión", description: "No se detecta usuario activo. Recarga la página.", variant: "destructive" });
             return;
         }
 
         setShowSaveDialog(false);
         setLoading(true);
         setProgress(10); // Start progress
-        toast({ title: t('converter.saving'), description: "Procesando modelo..." });
+        toast({ title: t('converter.saving'), description: "Iniciando proceso de guardado..." });
 
         try {
             let targetProjectId = saveData.projectId;
+            const currentUser = user; // Use context user directly
 
             // AUTO-CREATE PROJECT IF NONE SELECTED
             // Make this robust: if creation fails, try to fetch first project or use fallback
@@ -1630,102 +1624,112 @@ function Converter() {
                                         <X className="h-4 w-4" />
                                     </Button>
                                 </div>
-                                <div className="p-4 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                                <div className="p-4 space-y-3 overflow-y-auto custom-scrollbar flex-1">
 
                                     {/* RX Mode Toggle */}
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <label className="text-xs text-white font-medium">Efecto RX (Wireframe)</label>
-                                            <div
-                                                onClick={() => setIsRxMode(!isRxMode)}
-                                                className={`w - 10 h - 5 rounded - full flex items - center p - 1 cursor - pointer transition - colors ${isRxMode ? 'bg-[#29B6F6]' : 'bg-gray-700'} `}
-                                            >
-                                                <div className={`w - 3 h - 3 bg - white rounded - full shadow - md transform transition - transform ${isRxMode ? 'translate-x-5' : 'translate-x-0'} `} />
+                                    <div className="bg-[#0B0F14] border border-white/10 rounded-xl p-3 flex items-center gap-3 relative overflow-hidden group hover:border-[#29B6F6]/50 transition-colors">
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#29B6F6]" />
+                                        <div className="h-10 w-10 rounded-full bg-[#29B6F6]/10 flex items-center justify-center text-[#29B6F6] shrink-0">
+                                            <Eye className="h-5 w-5" />
+                                        </div>
+                                        <div className="flex-1 flex items-center justify-between">
+                                            <label className="text-sm text-white font-medium">Efecto RX (Wireframe)</label>
+                                            <Switch checked={isRxMode} onCheckedChange={setIsRxMode} />
+                                        </div>
+                                    </div>
+
+                                    {/* COLOR CARD */}
+                                    <div className="bg-[#0B0F14] border border-white/10 rounded-xl p-3 flex items-center gap-3 relative overflow-hidden group hover:border-[#F59E0B]/50 transition-colors">
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#F59E0B]" />
+                                        <div className="h-10 w-10 rounded-full bg-[#F59E0B]/10 flex items-center justify-center text-[#F59E0B] shrink-0">
+                                            <div className="w-5 h-5 rounded-full border-2 border-current" style={{ backgroundColor: color }}></div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-[10px] text-gray-400 uppercase tracking-wider block mb-1">Color Base</label>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="color"
+                                                    value={color}
+                                                    onChange={(e) => updateMaterialColor(e.target.value)}
+                                                    className="w-full h-6 bg-transparent border-none cursor-pointer p-0"
+                                                />
+                                                <span className="text-xs font-mono text-gray-300">{color}</span>
                                             </div>
                                         </div>
-                                        <p className="text-[10px] text-gray-500">Muestra la estructura geométrica del modelo.</p>
                                     </div>
 
-                                    <div className="h-px bg-white/10" />
-
-                                    {/* Color Picker */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs text-white font-medium block">Color Base</label>
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                type="color"
-                                                value={modelColor || '#ffffff'}
-                                                onChange={(e) => setModelColor(e.target.value)}
-                                                className="w-8 h-8 rounded cursor-pointer bg-transparent border-none p-0"
-                                            />
-                                            <span className="text-xs text-gray-400 font-mono">{modelColor || 'Original'}</span>
+                                    {/* TEXTURE CARD */}
+                                    <div className="bg-[#0B0F14] border border-white/10 rounded-xl p-3 flex items-center gap-3 relative overflow-hidden group hover:border-[#29B6F6]/50 transition-colors">
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#29B6F6]" />
+                                        <div className="h-10 w-10 rounded-full bg-[#29B6F6]/10 flex items-center justify-center text-[#29B6F6] shrink-0">
+                                            <ImageIcon className="h-5 w-5" />
                                         </div>
-                                        <p className="text-[10px] text-gray-500">Cambia el color de todos los materiales.</p>
-                                    </div>
-
-                                    <div className="h-px bg-white/10" />
-
-                                    {/* Manual Texture */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs text-white font-medium block">Textura Manual</label>
-                                        <div className="grid grid-cols-1 gap-2">
+                                        <div className="flex-1">
+                                            <label className="text-[10px] text-gray-400 uppercase tracking-wider block mb-1">Textura</label>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="w-full text-xs border-dashed border-gray-600 text-gray-400 hover:text-white hover:border-white"
-                                                onClick={() => document.getElementById('manual-texture-upload').click()}
-                                                disabled={!modelObject}
+                                                onClick={() => fileInputTextureRef.current?.click()}
+                                                className="w-full h-7 text-xs border-[#29B6F6]/30 text-[#29B6F6] hover:bg-[#29B6F6] hover:text-black"
                                             >
-                                                <Upload className="h-3 w-3 mr-2" />
-                                                Cargar Imagen...
+                                                Cargar Imagen
                                             </Button>
-                                            <input
-                                                id="manual-texture-upload"
-                                                type="file"
-                                                accept="image/*"
-                                                className="hidden"
-                                                onChange={handleManualTexture}
-                                            />
                                         </div>
-                                        <p className="text-[10px] text-gray-500">Aplica una imagen como textura a todo el modelo.</p>
                                     </div>
 
-                                    <div className="h-px bg-white/10" />
-
-                                    {/* Reset Button */}
+                                    {/* RESTORE BUTTON */}
                                     <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={handleResetStyle}
-                                        className="w-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20"
+                                        variant="ghost"
+                                        onClick={restoreOriginalParams}
+                                        className="w-full border border-white/5 bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-gray-400 text-xs h-8"
                                     >
-                                        <RotateCw className="h-3 w-3 mr-2" />
-                                        Restaurar Original
+                                        <RotateCw className="mr-2 h-3 w-3" /> Restaurar Original
                                     </Button>
 
-                                    <div className="h-px bg-white/10" />
+                                    <div className="h-px bg-white/10 my-2" />
 
-                                    {/* Y-Axis Control (Joystick/Slider) */}
-                                    <div className="space-y-4">
-                                        <label className="text-xs text-white font-medium flex justify-between">
-                                            Posición Vertical (Eje Y)
-                                            <span className="text-gray-400 font-mono">{modelY.toFixed(2)}</span>
-                                        </label>
-                                        <div className="flex items-center gap-2">
-                                            <ArrowLeft className="h-3 w-3 text-gray-500 rotate-90" /> {/* Down visual */}
-                                            <Slider
-                                                value={[modelY]}
-                                                min={-10}
-                                                max={10}
-                                                step={0.1}
-                                                onValueChange={(val) => setModelY(val[0])}
-                                                className="flex-1"
-                                            />
-                                            <ArrowLeft className="h-3 w-3 text-gray-500 -rotate-90" /> {/* Up visual */}
+                                    {/* POSITION Y */}
+                                    <div className="bg-[#0B0F14] border border-white/10 rounded-xl p-3 relative overflow-hidden group hover:border-[#10B981]/50 transition-colors">
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#10B981]" />
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className="h-8 w-8 rounded-full bg-[#10B981]/10 flex items-center justify-center text-[#10B981] shrink-0">
+                                                <BoxIcon className="h-4 w-4" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase tracking-wider block">Posición Y</label>
+                                                <span className="text-sm font-mono text-white">{verticalPos.toFixed(2)}</span>
+                                            </div>
                                         </div>
-                                        <div className="flex justify-center">
-                                            <Button size="sm" variant="ghost" className="h-6 text-[10px] text-gray-500" onClick={() => setModelY(0)}>Resetear Posición</Button>
+                                        <Slider
+                                            value={[verticalPos]}
+                                            min={-2}
+                                            max={2}
+                                            step={0.1}
+                                            onValueChange={updateVerticalPosition}
+                                            className="py-2"
+                                        />
+                                    </div>
+
+                                    {/* ROTATION */}
+                                    <div className="bg-[#0B0F14] border border-white/10 rounded-xl p-3 relative overflow-hidden group hover:border-[#8B5CF6]/50 transition-colors">
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#8B5CF6]" />
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className="h-8 w-8 rounded-full bg-[#8B5CF6]/10 flex items-center justify-center text-[#8B5CF6] shrink-0">
+                                                <RotateCw className="h-4 w-4" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase tracking-wider block">Rotación</label>
+                                                <span className="text-sm font-mono text-white">{rotation.toFixed(0)}°</span>
+                                            </div>
                                         </div>
+                                        <Slider
+                                            value={[rotation]}
+                                            min={0}
+                                            max={360}
+                                            step={1}
+                                            onValueChange={(v) => handleRotationChange(v[0])}
+                                            className="py-2"
+                                        />
                                     </div>
 
                                     {/* ROTATION CONTROLS (NEW) */}
