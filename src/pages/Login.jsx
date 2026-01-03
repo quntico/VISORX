@@ -213,6 +213,16 @@ function DiagnosticsPanel() {
             <button onClick={checkSession} className="bg-gray-700 hover:bg-gray-600 px-2 py-0.5 rounded text-white flex items-center gap-1">
               <RefreshCw className="w-3 h-3" /> Check
             </button>
+            <button
+              onClick={() => {
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.reload();
+              }}
+              className="bg-red-900/50 hover:bg-red-900 px-2 py-0.5 rounded text-red-200 flex items-center gap-1 border border-red-800"
+            >
+              <AlertCircle className="w-3 h-3" /> Reset Cache
+            </button>
           </div>
           {lastError && <div className="text-red-400 mt-1">ERR: {lastError}</div>}
         </div>
