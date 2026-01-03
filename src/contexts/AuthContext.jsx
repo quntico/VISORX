@@ -211,14 +211,16 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('visorx_user');
       localStorage.removeItem('visorx_mode');
 
+      // Attempt Supabase sign out but don't block if it fails (e.g. if we are offline/local)
       if (supabase) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut().catch(err => console.warn("Supabase SignOut Warning:", err));
       }
     } catch (error) {
       console.error("SignOut fatal error:", error);
     } finally {
       setUser(null);
       setRole(null);
+      // Force hard reload to login page to clear any in-memory state
       window.location.href = '/login';
     }
   };
