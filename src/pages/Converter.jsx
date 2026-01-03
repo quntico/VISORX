@@ -1171,10 +1171,13 @@ function Converter() {
                         targetProjectId = projects[0].id;
                     } else {
                         const newProjName = "Mi Primer Proyecto";
+                        console.log("Creating default project...");
+                        setUploadStatus("Creando primer proyecto...");
                         const newProject = await projectsService.create({
                             name: newProjName,
                             description: "Proyecto creado automáticamente desde el Convertidor"
                         });
+                        console.log("Project created:", newProject);
                         targetProjectId = newProject.id;
                         setProjects(prev => [newProject, ...prev]);
                     }
@@ -1186,8 +1189,12 @@ function Converter() {
             }
 
             // 1. Generate Blob
+            console.log("Starting GLB export...");
             setUploadStatus("Generando archivo GLB (esto puede tardar)...");
             setProgress(30);
+
+            // Allow UI to render
+            await new Promise(r => setTimeout(r, 500));
 
             const blob = await generateGLB();
             if (!blob || blob.size === 0) throw new Error("Error generando archivo GLB (vacío).");
