@@ -1185,13 +1185,15 @@ function Converter() {
                 }
             }
 
+            // 1. Generate Blob
+            setUploadStatus("Generando archivo GLB (esto puede tardar)...");
             setProgress(30);
 
-            // 1. Generate Blob
             const blob = await generateGLB();
             if (!blob || blob.size === 0) throw new Error("Error generando archivo GLB (vacío).");
 
             setProgress(60);
+            setUploadStatus("Subiendo archivo a la nube...");
 
             const fileName = `${saveData.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()} -${Date.now()}.glb`;
             const file = new File([blob], fileName, { type: 'application/octet-stream' });
@@ -1224,15 +1226,14 @@ function Converter() {
             setProgress(85);
 
             // 3. Create Model Record
+            setUploadStatus("Guardando en base de datos...");
+            setProgress(90);
+
             await modelsService.create({
-                name: saveData.name,
+                name: saveData.name.trim(),
                 project_id: targetProjectId,
-                project_id: targetProjectId,
-                // user_id: user.id, // Removed: Column does not exist in DB
                 file_url: publicUrl,
-                // size: blob.size, // Removed: Column does not exist in DB
-                // status: 'ready' // Removed: Column does not exist in DB
-                // size: blob.size, // Removed: Column does not exist in DB
+                // user_id and size removed as per schema
             });
 
             setProgress(100);
