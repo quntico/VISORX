@@ -25,7 +25,19 @@ const saveMockDB = (db) => {
 // HELPER: Determine if we should use Mock
 // Use mock if Supabase is missing OR explicitly requested (e.g. by auth state)
 const useMock = () => {
-  return !isSupabaseConfigured() || localStorage.getItem('visorx_mode') === 'simulation';
+  const mode = localStorage.getItem('visorx_mode');
+  if (mode === 'simulation') return true;
+
+  // Also check for dev user explicitly to prevent accidental real DB calls
+  const storedUser = localStorage.getItem('visorx_user');
+  if (storedUser) {
+    try {
+      const u = JSON.parse(storedUser);
+      if (u.id === 'dev_user') return true;
+    } catch (e) { }
+  }
+
+  return !isSupabaseConfigured();
 };
 
 /**
