@@ -1,21 +1,18 @@
 
 import { supabase } from './supabase';
 import { isSupabaseConfigured } from './supabase';
-import { supabaseAnonKey } from './customSupabaseClient'; // Import Anon Key for fallback
+import { supabaseAnonKey, supabaseUrl } from './customSupabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
 // ==========================================
 // MOCK DATABASE ENGINE (LOCAL STORAGE)
 // ==========================================
-const MOCK_DELAY = 600; // Simulate network lag
+const MOCK_DELAY = 600;
 
 const getMockDB = () => {
   const stored = localStorage.getItem('visorx_db');
   if (stored) return JSON.parse(stored);
-  // Initial Schema
-  return {
-    projects: [],
-    models: []
-  };
+  return { projects: [], models: [] };
 };
 
 const saveMockDB = (db) => {
@@ -23,12 +20,10 @@ const saveMockDB = (db) => {
 };
 
 // HELPER: Determine if we should use Mock
-// Use mock if Supabase is missing OR explicitly requested (e.g. by auth state)
 const useMock = () => {
   const mode = localStorage.getItem('visorx_mode');
   if (mode === 'simulation') return true;
 
-  // Also check for dev user explicitly to prevent accidental real DB calls
   const storedUser = localStorage.getItem('visorx_user');
   if (storedUser) {
     try {
@@ -38,6 +33,33 @@ const useMock = () => {
   }
 
   return !isSupabaseConfigured();
+};
+
+// ==========================================
+// RECOVERY CLIENT (Fallback for broken persist)
+// ==========================================
+let recoveryClient = null;
+
+export const setRecoveryToken = (token) => {
+  console.log("[DataService] Recovery Token Set. Switching to non-persistent client.");
+  try {
+    recoveryClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false, // Critical: Do not touch localStorage
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
+    });
+    // Set the session immediately on this new isolated client
+    recoveryClient.auth.setSession({ access_token: token, refresh_token: '' });
+  } catch (e) {
+    console.error("Failed to init recovery client", e);
+  }
+};
+
+const getClient = () => {
+  if (recoveryClient) return recoveryClient;
+  return supabase;
 };
 
 /**
@@ -50,7 +72,7 @@ export const projectsService = {
       return getMockDB().projects.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('projects')
       .select('*')
       .order('created_at', { ascending: false });
@@ -66,7 +88,7 @@ export const projectsService = {
       return p;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('projects')
       .select('*')
       .eq('id', id)
@@ -76,22 +98,21 @@ export const projectsService = {
   },
 
   async create(project) {
-    // 1. Try Mock Mode Explicitly
     if (useMock()) {
       return createMockProject(project);
     }
 
-    // 2. Check Real Auth (Use getSession for better reliability)
-    const { data: { session } } = await supabase.auth.getSession();
+    // Use recovery client session or global session
+    const client = getClient();
+    const { data: { session } } = await client.auth.getSession();
     const user = session?.user;
 
-    // 3. Fallback to Mock if no real user (Simulation Mode Auto-Failover)
     if (!user) {
       console.error("No authenticated session found for project creation.");
       throw new Error("Sesión expirada. Por favor recarga la página o inicia sesión.");
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('projects')
       .insert([{ ...project, user_id: user.id }])
       .select()
@@ -106,7 +127,7 @@ export const projectsService = {
       return;
     }
 
-    const { error } = await supabase
+    const { error } = await getClient()
       .from('projects')
       .delete()
       .eq('id', id);
@@ -134,7 +155,6 @@ const deleteMockProject = async (id) => {
   await new Promise(r => setTimeout(r, MOCK_DELAY));
   const db = getMockDB();
   db.projects = db.projects.filter(p => p.id !== id);
-  // Cascade delete models
   db.models = db.models.filter(m => m.project_id !== id);
   saveMockDB(db);
 };
@@ -151,7 +171,7 @@ export const modelsService = {
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('models')
       .select('*')
       .eq('project_id', projectId)
@@ -166,9 +186,7 @@ export const modelsService = {
       return getMockDB().models.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
 
-    // RLS will automatically filter by auth.uid() if policy uses it
-    // SIMPLIFIED: Removing join to prevent RLS from hiding models if project is missing
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('models')
       .select('*')
       .order('created_at', { ascending: false });
@@ -182,12 +200,11 @@ export const modelsService = {
       await new Promise(r => setTimeout(r, MOCK_DELAY));
       const m = getMockDB().models.find(m => m.id === id);
       if (!m) throw new Error("Model not found (Mock)");
-      // Join project info manually
       const p = getMockDB().projects.find(p => p.id === m.project_id);
       return { ...m, projects: p || {} };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('models')
       .select('*, projects(name, description)')
       .eq('id', id)
@@ -212,18 +229,14 @@ export const modelsService = {
 
     if (useMock()) return runMock();
 
-    // Attempt real insert
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('models')
       .insert([model])
       .select()
       .single();
 
-    // Fallback if error (e.g. auth fail or RLS)
-    // Fallback if error (e.g. auth fail or RLS)
     if (error) {
       console.error("Real DB insert failed:", error);
-      // DO NOT FALLBACK TO MOCK silently. Throw the error so the UI knows it failed.
       throw error;
     }
     return data;
@@ -238,7 +251,7 @@ export const modelsService = {
       return;
     }
 
-    const { error } = await supabase
+    const { error } = await getClient()
       .from('models')
       .delete()
       .eq('id', id);
@@ -251,12 +264,9 @@ export const modelsService = {
  */
 export const publicLinksService = {
   async getByToken(token) {
-    if (useMock()) {
-      // Not fully supported in mock but let's try
-      return null;
-    }
+    if (useMock()) return null;
 
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('public_links')
       .select('*, models(*)')
       .eq('token', token)
@@ -270,10 +280,9 @@ export const publicLinksService = {
       return { token: 'mock_token_' + modelId };
     }
 
-    // Generate a secure random token
     const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('public_links')
       .insert([{ model_id: modelId, token }])
       .select()
@@ -289,8 +298,6 @@ export const publicLinksService = {
 export const storageService = {
   async uploadFile(bucket, path, file, onProgress) {
     const runMockObj = () => {
-      // Use Blob URL instead of Data URL to avoid localStorage quota limits
-      // This is crucial for large GLB files in "Test Mode"
       return new Promise((resolve) => {
         let progress = 0;
         const interval = setInterval(() => {
@@ -298,7 +305,6 @@ export const storageService = {
           if (onProgress) onProgress(progress);
           if (progress >= 100) {
             clearInterval(interval);
-            // Return ephemeral URL. Works perfectly for current session.
             const blobUrl = URL.createObjectURL(file);
             resolve(blobUrl);
           }
@@ -309,24 +315,16 @@ export const storageService = {
     if (useMock()) return runMockObj();
 
     try {
-      // If onProgress is provided, we use XMLHttpRequest to track upload
       if (onProgress) {
-        const { data: { session } } = await supabase.auth.getSession();
-        // Use User Token if available, otherwise fallback to Anon Key
+        // Use getClient() to get the correct client (recovery or default)
+        const client = getClient();
+        const { data: { session } } = await client.auth.getSession();
+
         const token = session?.access_token || supabaseAnonKey;
 
         if (!token) throw new Error("No token available for upload (User or Anon)");
 
-        // Hardcoded URL base from client config or derived
-        // We can derive it or import it, but standard supabase pattern is:
-        // https://<project>.supabase.co/storage/v1/object/<bucket>/<path>
-
-        // Get URL from internal client if possible, or assume standard
-        // We will use the client's URL if accessible, or rebuild it. 
-        // supabase.storageUrl is usually internal.
-        // Let's rely on standard endpoints.
-
-        const projectUrl = 'https://uufffrsgpdcocosfukjm.supabase.co'; // Extracted from customSupabaseClient.js
+        const projectUrl = supabaseUrl;
         const url = `${projectUrl}/storage/v1/object/${bucket}/${path}`;
 
         return new Promise((resolve, reject) => {
@@ -335,9 +333,6 @@ export const storageService = {
 
           xhr.setRequestHeader('Authorization', `Bearer ${token}`);
           xhr.setRequestHeader('x-upsert', 'false');
-          // Content-Type is auto-set by browser for formatting, but for raw binary we might need it
-          // Supabase expects raw body usually for binary
-          // xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream'); 
 
           xhr.upload.onprogress = (e) => {
             if (e.lengthComputable) {
@@ -348,8 +343,7 @@ export const storageService = {
 
           xhr.onload = () => {
             if (xhr.status >= 200 && xhr.status < 300) {
-              // Success
-              const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
+              const { data: { publicUrl } } = client.storage.from(bucket).getPublicUrl(path);
               resolve(publicUrl);
             } else {
               reject(new Error(`Upload failed: ${xhr.statusText} (${xhr.responseText})`));
@@ -357,30 +351,23 @@ export const storageService = {
           };
 
           xhr.onerror = () => reject(new Error('Network Error during upload'));
-
-          // Send file directly
           xhr.send(file);
         });
       }
 
-      const { data, error } = await supabase.storage
+      const { data, error } = await getClient().storage
         .from(bucket)
-        .upload(path, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+        .upload(path, file, { cacheControl: '3600', upsert: false });
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = getClient().storage
         .from(bucket)
         .getPublicUrl(path);
 
       return publicUrl;
     } catch (err) {
-      console.log("Storage upload failed, falling back to mock (DataURL).", err);
-      // Only fallback to mock if it creates a DataURL, but for large files this might crash.
-      // Better to throw real error for large files.
+      console.log("Storage upload failed, falling back to mock.", err);
       if (file.size > 50 * 1024 * 1024) throw err;
       return runMockObj();
     }

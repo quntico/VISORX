@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
+import { setRecoveryToken } from '@/lib/data-service';
 
 const AuthContext = createContext({});
 
@@ -153,6 +154,7 @@ export function AuthProvider({ children }) {
 
                 if (fallbackUser) {
                   logAuth('Fallback getUser SUCCESS.');
+                  setRecoveryToken(accessToken);
                   setUser(fallbackUser);
                   await fetchProfile(fallbackUser);
                   // Manually persist if possible (optional, but good for refresh)
