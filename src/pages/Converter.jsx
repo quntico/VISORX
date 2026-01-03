@@ -1083,6 +1083,14 @@ function Converter() {
             return;
         }
 
+        // Ensure user is present (refresh session if needed)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+            toast({ title: "Error de Sesión", description: "Tu sesión ha expirado. Recarga la página.", variant: "destructive" });
+            return;
+        }
+        const currentUser = session.user;
+
         setShowSaveDialog(false);
         setLoading(true);
         setProgress(10); // Start progress
@@ -1091,17 +1099,27 @@ function Converter() {
         try {
             let targetProjectId = saveData.projectId;
 
-            // AUTO-CREATE PROJECT IF NONE SELECTED (or none exist)
+            // AUTO-CREATE PROJECT IF NONE SELECTED
+            // Make this robust: if creation fails, try to fetch first project or use fallback
             if (!targetProjectId) {
-                // Default project name if user didn't specify one (though we might add an input for it)
-                const newProjName = "Mi Primer Proyecto";
-                const newProject = await projectsService.create({
-                    name: newProjName,
-                    description: "Proyecto creado automáticamente desde el Convertidor"
-                });
-                targetProjectId = newProject.id;
-                // Update local state to reflect new project immediately
-                setProjects(prev => [newProject, ...prev]);
+                try {
+                    // Try strictly to find "Mi Primer Proyecto" first to avoid duplicates
+                    if (projects.length > 0) {
+                        targetProjectId = projects[0].id;
+                    } else {
+                        const newProjName = "Mi Primer Proyecto";
+                        const newProject = await projectsService.create({
+                            name: newProjName,
+                            description: "Proyecto creado automáticamente desde el Convertidor"
+                        });
+                        targetProjectId = newProject.id;
+                        setProjects(prev => [newProject, ...prev]);
+                    }
+                } catch (projErr) {
+                    console.error("Auto-creation failed, using fallback ID:", projErr);
+                    // Use a fallback so we don't block the user's hard work (model upload)
+                    targetProjectId = 'default-project-' + Date.now();
+                }
             }
 
             setProgress(30);
@@ -1117,7 +1135,8 @@ function Converter() {
 
             // 2. Upload to Supabase Storage
             // 2. Upload to Supabase Storage
-            const publicUrl = await storageService.uploadFile('models', `${user.id} /${targetProjectId}/${fileName} `, file);
+            // 2. Upload to Supabase Storage
+            const publicUrl = await storageService.uploadFile('models', `${currentUser.id}/${targetProjectId}/${fileName}`, file);
 
             // 2.5 Generate & Upload Thumbnail (Best Effort)
             try {
@@ -1131,7 +1150,7 @@ function Converter() {
                     const thumbBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.5));
                     if (thumbBlob) {
                         const thumbName = fileName.replace(/\.[^/.]+$/, "") + ".png";
-                        await storageService.uploadFile('models', `${user.id} /${targetProjectId}/${thumbName} `, thumbBlob);
+                        await storageService.uploadFile('models', `${currentUser.id}/${targetProjectId}/${thumbName}`, thumbBlob);
                     }
                 }
             } catch (thumbErr) {
@@ -1575,15 +1594,16 @@ function Converter() {
                             {showControls && (
                                 <div
                                     className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+
                                     onClick={() => setShowControls(false)}
                                 />
                             )}
 
                             <aside className={`
-                                fixed inset - y - 0 right - 0 z - 50 w - 72 bg - [#151B23] border - l border - white / 10 flex flex - col shadow - 2xl transition - transform duration - 300
-md:relative md: w - 64 md: translate - x - 0 md: shadow - none
-                                ${showControls ? 'translate-x-0' : 'translate-x-full md:hidden'}
-`}>
+                                fixed inset-y-0 right-0 z-50 w-72 bg-black/60 backdrop-blur-xl border-l border-white/10 flex flex-col shadow-2xl transition-transform duration-300
+                            md:relative md:w-64 md:translate-x-0 md:shadow-none
+                            ${showControls ? 'translate-x-0' : 'translate-x-full md:hidden'}
+                            `}>
                                 <div className="p-4 border-b border-white/10 flex justify-between items-center">
                                     <h3 className="text-xs font-bold text-[#29B6F6] uppercase flex items-center gap-2">
                                         <Settings className="h-3 w-3" /> Control de Modelo
@@ -1890,10 +1910,10 @@ md:relative md: w - 64 md: translate - x - 0 md: shadow - none
                         <span className="text-[9px] text-gray-400">Guardar</span>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* NEW UPLOAD DIALOG */}
-            <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+            < Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog} >
                 <DialogContent className="bg-[#151B23] border-[#29B6F6]/20 text-white sm:max-w-xl">
                     <DialogHeader>
                         <DialogTitle className="text-[#29B6F6]">Subir Archivos 3D</DialogTitle>
@@ -1925,10 +1945,10 @@ md:relative md: w - 64 md: translate - x - 0 md: shadow - none
                         </Button>
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* SAVE TO PROJECT DIALOG */}
-            <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+            < Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog} >
                 <DialogContent className="bg-[#151B23] border-[#29B6F6]/20 text-white sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-white">
@@ -2010,9 +2030,9 @@ md:relative md: w - 64 md: translate - x - 0 md: shadow - none
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
             {/* AR PREVIEW DIALOG */}
-            <Dialog open={showAR} onOpenChange={setShowAR}>
+            < Dialog open={showAR} onOpenChange={setShowAR} >
                 <DialogContent className="bg-[#151B23] border-[#29B6F6]/20 text-white w-screen h-screen max-w-none m-0 rounded-none flex flex-col p-0">
                     <DialogHeader className="p-4 bg-[#0B0F14] shrink-0">
                         <DialogTitle className="flex items-center gap-2 text-white">
@@ -2057,12 +2077,13 @@ md:relative md: w - 64 md: translate - x - 0 md: shadow - none
                         <Button onClick={() => setShowAR(false)} variant="secondary" className="w-full">Cerrar</Button>
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* MOBILE LIBRARY OVERLAY */}
-            <MobileLibraryOverlay
+            < MobileLibraryOverlay
                 open={showMobileLibrary}
-                onClose={() => setShowMobileLibrary(false)}
+                onClose={() => setShowMobileLibrary(false)
+                }
                 models={userModels}
                 onLoadModel={handleLoadModel}
                 onDeleteModel={handleDeleteModel}
