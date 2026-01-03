@@ -7,7 +7,7 @@ const customSupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: false // MANUAL HANDLING in Login.jsx
+        detectSessionInUrl: true // Re-enable for PKCE storage
     }
 });
 

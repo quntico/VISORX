@@ -88,16 +88,18 @@ export function AuthProvider({ children }) {
     }, 8000);
 
     // Initial session check
+    // Initial session check
     const initSession = async () => {
-      // CAPTURE HASH BEFORE IT IS STRIPPED
+      // CAPTURE HASH OR CODE (PKCE) BEFORE IT IS STRIPPED
       const hasAuthHash = window.location.hash && window.location.hash.includes('access_token');
+      const hasAuthCode = window.location.search && window.location.search.includes('code=');
 
-      if (hasAuthHash) {
-        console.log('[AuthDebug] Auth hash detected. Entering POLLING MODE.');
+      if (hasAuthHash || hasAuthCode) {
+        console.log('[AuthDebug] Auth Token/Code detected. Entering POLLING MODE.');
 
         // Polling Strategy: Try to get session for 5 seconds
         let attempts = 0;
-        const maxAttempts = 10;
+        const maxAttempts = 15; // Increased timeout for code exchange
 
         const poll = setInterval(async () => {
           attempts++;
@@ -118,7 +120,7 @@ export function AuthProvider({ children }) {
             // Redirect if on login page
             if (window.location.pathname === '/login') window.location.href = '/dashboard';
           } else if (attempts >= maxAttempts) {
-            console.warn('[AuthDebug] Polling TIMEOUT. No session found after hash.');
+            console.warn('[AuthDebug] Polling TIMEOUT. No session found after hash/code.');
             clearInterval(poll);
             // Only give up now
             setLoading(false);
