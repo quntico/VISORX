@@ -73,7 +73,7 @@ export function AuthProvider({ children }) {
     // Initialize session
     const initAuth = async () => {
       try {
-        // Check for local dev user first
+        // 1. Check for local dev user first
         const storedUser = localStorage.getItem('visorx_user');
         if (storedUser) {
           const parsed = JSON.parse(storedUser);
@@ -83,7 +83,38 @@ export function AuthProvider({ children }) {
           return;
         }
 
-        // Get current session
+        // 2. Manual Token Recovery (Robust Fallback)
+        // If Supabase auto-detect fails, we manually process the hash
+        const hash = window.location.hash;
+        if (hash && hash.includes('access_token')) {
+          console.log('[Auth] Detected OAuth hash. Attempting manual session recovery...');
+          const params = new URLSearchParams(hash.substring(1));
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+
+          if (accessToken) {
+            const { data: { session }, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || ''
+            });
+
+            if (!error && session?.user) {
+              console.log('[Auth] Manual session recovery successful.');
+              setUser(session.user);
+              await fetchProfile(session.user);
+              setLoading(false);
+
+              // Clean URL and redirect
+              window.location.hash = '';
+              if (window.location.pathname === '/login') {
+                window.location.href = '/dashboard';
+              }
+              return;
+            }
+          }
+        }
+
+        // 3. Standard Session Check
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session?.user) {
@@ -119,6 +150,7 @@ export function AuthProvider({ children }) {
         setRole(null);
       }
 
+      // Always clear loading on state change
       setLoading(false);
     });
 
