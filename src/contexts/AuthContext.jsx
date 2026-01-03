@@ -96,7 +96,7 @@ export function AuthProvider({ children }) {
 
     const initAuth = async () => {
       try {
-        logAuth('Auth Init Started (v2.1 - Timeout Fix)');
+        logAuth('Auth Init Started (v3.0 - Fallback Mode)');
 
         const storedUser = localStorage.getItem('visorx_user');
         if (storedUser) {
@@ -118,49 +118,57 @@ export function AuthProvider({ children }) {
           const refreshToken = params.get('refresh_token');
 
           if (accessToken) {
-            const tokenPreview = accessToken.substring(0, 10);
-            logAuth(`Extracted token: ${tokenPreview}...`);
-            logAuth('Calling setSession (with 3s timeout)...');
+            logAuth('Attempting setSession...');
 
             try {
-              // Wrap setSession in a race with a timeout
+              // 1. Try setSession with timeout
               const sessionPromise = supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken || ''
               });
 
               const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('setSession call timed out')), 3000)
+                setTimeout(() => reject(new Error('setSession_TIMEOUT')), 3000)
               );
 
               const result = await Promise.race([sessionPromise, timeoutPromise]);
               const { data: { session }, error } = result;
 
-              if (error) {
-                logAuth(`setSession FAILED: ${error.message}`);
-              }
+              if (error) throw error;
 
-              if (!error && session?.user) {
-                logAuth(`setSession SUCCESS. User: ${session.user.email}`);
+              if (session?.user) {
+                logAuth('setSession SUCCESS.');
                 setUser(session.user);
                 await fetchProfile(session.user);
-                setLoading(false);
-
-                window.location.hash = '';
-                if (window.location.pathname === '/login') {
-                  logAuth('Redirecting to dashboard...');
-                  window.location.href = '/dashboard';
-                }
-                processingHash.current = false;
-                return;
-              } else {
-                logAuth('setSession returned success but NO session.');
+                finalizeLogin();
               }
             } catch (err) {
-              logAuth(`setSession EXCEPTION: ${err.message}`);
+              logAuth(`setSession FAILED: ${err.message}. Trying Fallback: getUser...`);
+
+              // 2. FALLBACK: Create user from token stateless
+              try {
+                const { data: { user: fallbackUser }, error: getUserError } = await supabase.auth.getUser(accessToken);
+
+                if (getUserError) throw getUserError;
+
+                if (fallbackUser) {
+                  logAuth('Fallback getUser SUCCESS.');
+                  setUser(fallbackUser);
+                  await fetchProfile(fallbackUser);
+                  // Manually persist if possible (optional, but good for refresh)
+                  finalizeLogin();
+                } else {
+                  logAuth('Fallback getUser returned null.');
+                  processingHash.current = false;
+                }
+              } catch (fallbackErr) {
+                logAuth(`Fallback FAILED: ${fallbackErr.message}`);
+                processingHash.current = false;
+              }
             }
+          } else {
+            processingHash.current = false;
           }
-          processingHash.current = false;
         } else {
           logAuth('No access_token in hash.');
         }
@@ -185,6 +193,16 @@ export function AuthProvider({ children }) {
           logAuth('Keeping loading = true (Hash processing logic active)');
         }
       }
+    };
+
+    const finalizeLogin = () => {
+      setLoading(false);
+      window.location.hash = '';
+      if (window.location.pathname === '/login') {
+        logAuth('Redirecting to dashboard...');
+        window.location.href = '/dashboard';
+      }
+      processingHash.current = false;
     };
 
     initAuth();
