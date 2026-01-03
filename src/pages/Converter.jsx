@@ -69,13 +69,19 @@ function Converter() {
     const [helpContent, setHelpContent] = useState(null);
     const [showSaveDialog, setShowSaveDialog] = useState(false);
     const [showUploadDialog, setShowUploadDialog] = useState(false);
-    const [isRxMode, setIsRxMode] = useState(false); // New state for Wireframe/RX Mode
-    const [showControls, setShowControls] = useState(true); // Right Sidebar Visibility
 
-    const [modelColor, setModelColor] = useState(null); // Manual Color override. Null = no override.
-    const [modelY, setModelY] = useState(0); // Vertical Position Adjustment
+    // CONTROL PANEL STATE
+    const [isRxMode, setIsRxMode] = useState(false);
+    const [showControls, setShowControls] = useState(true);
+
+    // Model Params
+    const [color, setColor] = useState("#ffffff");
+    const [modelColor, setModelColor] = useState("#ffffff"); // Kept for compat
+    const [rotation, setRotation] = useState(0);
+    const [verticalPos, setVerticalPos] = useState(0); // Replaces modelY
+
     const [saveData, setSaveData] = useState({ name: '', projectId: '' });
-    const [largeFileToUpload, setLargeFileToUpload] = useState(null); // New state for large file confirmation
+    const [largeFileToUpload, setLargeFileToUpload] = useState(null);
 
     // LOAD PROJECTS & MODELS
     useEffect(() => {
@@ -271,6 +277,50 @@ function Converter() {
 
     // MOBILE UI STATE
     const [showMobileLibrary, setShowMobileLibrary] = useState(false);
+
+    // HANDLERS FOR CONTROL PANEL (State defined above)
+    const updateMaterialColor = (c) => {
+        setColor(c);
+        setModelColor(c); // Sync
+        if (modelObject && !isRxMode) {
+            modelObject.traverse((child) => {
+                if (child.isMesh && child.material && child.material.color) {
+                    child.material.color.set(c);
+                }
+            });
+        }
+    };
+
+    const updateVerticalPosition = (val) => {
+        const y = val[0];
+        setVerticalPos(y);
+        if (modelObject) modelObject.position.y = y;
+    };
+
+    const handleRotationChange = (val) => {
+        setRotation(val);
+        if (modelObject) modelObject.rotation.y = val * (Math.PI / 180);
+    };
+
+    const restoreOriginalParams = () => {
+        if (!modelObject) return;
+        setColor("#ffffff");
+        setModelColor("#ffffff");
+        setVerticalPos(0);
+        setRotation(0);
+        setIsRxMode(false);
+
+        modelObject.position.y = 0;
+        modelObject.rotation.y = 0;
+
+        // Restore materials
+        modelObject.traverse((child) => {
+            if (child.isMesh && child.userData.initialMat) {
+                child.material = child.userData.initialMat.clone();
+            }
+        });
+        toast({ title: "Restaurado", description: "Valores originales aplicados." });
+    };
 
     // Sync refs for animation loop
     useEffect(() => {
@@ -578,22 +628,26 @@ function Converter() {
 
     // Color Override Effect
     useEffect(() => {
-        if (!modelObject || isRxMode || !modelColor) return; // Don't override if null or RX
+        if (!modelObject || isRxMode) return;
 
-        // If color is white, we might not want to force it if textures exist,
-        // but user asked for manual control.
-        // Let's only apply if user explicitly changed it (we can't know that easily without tracking initial).
-        // For now, simple application:
+        // Apply color if it's not default white
+        if (color && color !== '#ffffff') {
+            modelObject.traverse((child) => {
+                if (child.isMesh && child.material && child.material.color) {
+                    child.material.color.set(color);
+                }
+            });
+        }
 
-        modelObject.traverse((child) => {
-            if (child.isMesh && child.material) {
-                // If standard material, update color
-                if (child.material.color) {
+        // Apply modelColor if it's set
+        if (modelColor) {
+            modelObject.traverse((child) => {
+                if (child.isMesh && child.material && child.material.color) {
                     child.material.color.set(modelColor);
                 }
-            }
-        });
-    }, [modelColor, isRxMode, modelObject]);
+            });
+        }
+    }, [color, modelColor, isRxMode, modelObject]);
 
     const handleManualTexture = (e) => {
         const file = e.target.files[0];
