@@ -15,6 +15,7 @@ function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useLanguage();
+  const [isLoggingIn, setIsLoggingIn] = React.useState(false);
 
   useEffect(() => {
     // Check for OAuth errors in URL
@@ -27,6 +28,7 @@ function Login() {
         description: errorDescription?.replace(/\+/g, ' ') || 'Authentication error',
         variant: "destructive"
       });
+      setIsLoggingIn(false);
     }
 
     // Redirect if user is logged in
@@ -35,8 +37,18 @@ function Login() {
     }
   }, [user, loading, navigate, toast, t]);
 
-  const handleLoginClick = () => {
-    signInWithGoogle();
+  const handleLoginClick = async () => {
+    setIsLoggingIn(true);
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      setIsLoggingIn(false);
+      toast({
+        title: "Error",
+        description: "No se pudo iniciar sesión. Por favor intenta de nuevo.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -99,14 +111,14 @@ function Login() {
               <Button
                 className="w-full bg-white text-gray-900 hover:bg-gray-100 font-semibold h-12"
                 onClick={handleLoginClick}
-                disabled={loading}
+                disabled={isLoggingIn}
               >
                 <img
                   src="https://www.google.com/favicon.ico"
                   alt="Google"
                   className="w-5 h-5 mr-3"
                 />
-                {loading ? 'Iniciando...' : t('auth.signInButton')}
+                {isLoggingIn ? 'Iniciando...' : t('auth.signInButton')}
               </Button>
 
               {/* Dev Bypass Button */}
