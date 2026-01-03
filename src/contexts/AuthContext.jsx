@@ -70,6 +70,17 @@ export function AuthProvider({ children }) {
       return;
     }
 
+    // SAFETY VALVE: Force stop loading after 6 seconds no matter what
+    const safetyTimeout = setTimeout(() => {
+      setLoading(prev => {
+        if (prev) {
+          console.warn('[Auth] Safety timeout triggered. Forcing loading=false.');
+          return false;
+        }
+        return prev;
+      });
+    }, 6000);
+
     // Initialize session
     const initAuth = async () => {
       try {
