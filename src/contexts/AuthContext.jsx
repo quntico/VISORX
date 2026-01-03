@@ -89,16 +89,48 @@ export function AuthProvider({ children }) {
 
     // Initial session check
     const initSession = async () => {
-      // If we are redirecting from Google, we have a hash. 
-      // Do NOT set loading=false yet, let Supabase process the hash.
-      if (window.location.hash && window.location.hash.includes('access_token')) {
-        console.log('[AuthDebug] Auth hash detected, waiting for onAuthStateChange...');
-        // The subscription below will handle the state update
-        return;
+      // CAPTURE HASH BEFORE IT IS STRIPPED
+      const hasAuthHash = window.location.hash && window.location.hash.includes('access_token');
+
+      if (hasAuthHash) {
+        console.log('[AuthDebug] Auth hash detected. Entering POLLING MODE.');
+
+        // Polling Strategy: Try to get session for 5 seconds
+        let attempts = 0;
+        const maxAttempts = 10;
+
+        const poll = setInterval(async () => {
+          attempts++;
+          console.log(`[AuthDebug] Polling for session (Attempt ${attempts}/${maxAttempts})...`);
+
+          const { data: { session }, error } = await supabase.auth.getSession();
+
+          if (session?.user) {
+            console.log('[AuthDebug] Polling SUCCESS! Session found.');
+            clearInterval(poll);
+            setUser(session.user);
+            await fetchProfile(session.user);
+            localStorage.removeItem('visorx_mode');
+
+            // CRITICAL: Ensure we stop loading state
+            setLoading(false);
+
+            // Redirect if on login page
+            if (window.location.pathname === '/login') window.location.href = '/dashboard';
+          } else if (attempts >= maxAttempts) {
+            console.warn('[AuthDebug] Polling TIMEOUT. No session found after hash.');
+            clearInterval(poll);
+            // Only give up now
+            setLoading(false);
+          }
+        }, 500);
+
+        return; // Skip standard init
       }
 
+      // STANDARD INIT (No Hash)
       try {
-        console.log('[AuthDebug] Checking initial session...');
+        console.log('[AuthDebug] Checking initial session (Standard mode)...');
 
         // CHECK LOCAL FALLBACK FIRST
         const storedUser = localStorage.getItem('visorx_user');
@@ -128,7 +160,7 @@ export function AuthProvider({ children }) {
         setUser(null);
         setRole(null);
       } finally {
-        if (!window.location.hash.includes('access_token')) {
+        if (!hasAuthHash) {
           clearTimeout(timeoutId);
           setLoading(false);
         }

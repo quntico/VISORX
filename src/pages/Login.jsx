@@ -17,26 +17,70 @@ function Login() {
   const { toast } = useToast();
   const { t } = useLanguage();
 
+  // --- MANUAL TOKEN HANDLING (RADICAL FIX) ---
+  const [resolvingToken, setResolvingToken] = React.useState(false);
+  const [tokenDebug, setTokenDebug] = React.useState('');
+
   useEffect(() => {
-    // Check for error in URL hash (from OAuth redirect)
-    const hash = window.location.hash;
-    if (hash && hash.includes('error_description')) {
-      const params = new URLSearchParams(hash.substring(1));
-      const errorDescription = params.get('error_description');
-      const errorCode = params.get('error_code');
+    const handleHash = async () => {
+      const hash = window.location.hash;
+      if (!hash) return;
 
-      console.error('[AuthDebug] URL Hash Error:', errorDescription, errorCode);
-
-      if (errorDescription) {
+      // Check for error
+      if (hash.includes('error_description')) {
+        const params = new URLSearchParams(hash.substring(1));
+        const errorDescription = params.get('error_description');
+        console.error('[AuthDebug] URL Hash Error:', errorDescription);
         toast({
-          title: t('auth.errorTitle'),
+          title: "Error de Login",
           description: errorDescription.replace(/\+/g, ' '),
           variant: "destructive"
         });
+        return;
       }
-    }
 
-    if (user && !loading) {
+      // Check for access token
+      if (hash.includes('access_token')) {
+        console.log('[AuthDebug] Manual Token Detection Triggered');
+        setResolvingToken(true);
+        setTokenDebug('Token detected. Attempting manual exchange...');
+
+        try {
+          // Parse hash manually
+          const params = new URLSearchParams(hash.substring(1));
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+
+          if (accessToken) {
+            setTokenDebug('Token parsed. Setting session...');
+
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || ''
+            });
+
+            if (error) throw error;
+
+            if (data.session) {
+              setTokenDebug('Session established! Redirecting...');
+              // Force redirect
+              setTimeout(() => navigate('/dashboard'), 500);
+            } else {
+              throw new Error("Session was null after setSession");
+            }
+          }
+        } catch (err) {
+          console.error("Manual Token Error:", err);
+          setTokenDebug(`Error: ${err.message}`);
+          // Allow user to see error before clearing
+        }
+      }
+    };
+
+    handleHash();
+
+    // Standard user redirection check
+    if (user && !loading && !resolvingToken) {
       console.log('[AuthDebug] Login page detected user, redirecting to dashboard');
       navigate('/dashboard');
     }
@@ -55,6 +99,28 @@ function Login() {
       </Helmet>
 
       <div className="min-h-screen bg-[#0B0F14] flex items-center justify-center p-4 relative overflow-hidden">
+
+        {/* RADICAL DEBUG OVERLAY */}
+        {resolvingToken && (
+          <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center text-center p-8">
+            <Loader2 className="h-16 w-16 text-[#29B6F6] animate-spin mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">ANALIZANDO LOGIN (RADICAL MODE)</h2>
+            <p className="text-green-400 font-mono text-sm mb-4 max-w-lg break-all mx-auto">
+              {tokenDebug}
+            </p>
+            <div className="p-4 bg-gray-800 rounded text-xs text-gray-500 font-mono mb-4">
+              Esto evita el rebote automático. Si ves esto, Google respondió correctamente.
+            </div>
+            {/* Panic Button if it gets stuck */}
+            <Button
+              variant="destructive"
+              onClick={() => { window.location.hash = ''; window.location.reload(); }}
+            >
+              Cancelar y Reintentar
+            </Button>
+          </div>
+        )}
+
         {/* Background Grid */}
         <div className="absolute inset-0 opacity-10">
           <div className="h-full w-full" style={{
@@ -64,6 +130,7 @@ function Login() {
         </div>
 
         <motion.div
+          // ... rest of component
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
