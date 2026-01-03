@@ -769,6 +769,8 @@ function Converter() {
         }
 
         if (extractedFiles.length === 0) {
+            console.warn("No files extracted from ZIP or input.");
+            toast({ title: "Advertencia", description: "No se encontraron archivos válidos.", variant: "destructive" });
             setLoading(false);
             return;
         }
@@ -799,10 +801,14 @@ function Converter() {
         });
 
         if (!mainFile) {
+            console.error("No compatible 3D model found in extracted files.");
             toast({ title: "Sin modelo", description: "No se encontró ningún archivo 3D compatible (.obj, .fbx, .glb, .dae) en lo que subiste.", variant: "destructive" });
             setLoading(false);
             return;
         }
+
+        console.log("Main Model File Found:", mainFile.name);
+        setUploadStatus(`Cargando modelo: ${mainFile.name}...`);
 
         // SIZE CHECK (Limit to 200MB)
         if (mainFile.size > 200 * 1024 * 1024) {
