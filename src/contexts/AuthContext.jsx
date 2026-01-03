@@ -89,6 +89,14 @@ export function AuthProvider({ children }) {
 
     // Initial session check
     const initSession = async () => {
+      // If we are redirecting from Google, we have a hash. 
+      // Do NOT set loading=false yet, let Supabase process the hash.
+      if (window.location.hash && window.location.hash.includes('access_token')) {
+        console.log('[AuthDebug] Auth hash detected, waiting for onAuthStateChange...');
+        // The subscription below will handle the state update
+        return;
+      }
+
       try {
         console.log('[AuthDebug] Checking initial session...');
 
@@ -110,8 +118,6 @@ export function AuthProvider({ children }) {
           setUser(session.user);
           await fetchProfile(session.user);
         } else {
-          // NO SESSION? DO NOT AUTO-ACTIVATE SIMULATION MODE
-          // This allows the user to see the Login Screen.
           console.log('[AuthDebug] No session found. Waiting for user action.');
           setUser(null);
           setRole(null);
@@ -119,18 +125,12 @@ export function AuthProvider({ children }) {
 
       } catch (error) {
         console.error("[AuthDebug] Auth check failed:", error);
-        // Do not force Simulation Mode on error. Show Login screen.
         setUser(null);
         setRole(null);
-        // localStorage.setItem('visorx_mode', 'simulation'); // REMOVED
       } finally {
-        clearTimeout(timeoutId);
-        // If we have a hash with access_token, we might be in the middle of a redirect flow.
-        // Let onAuthStateChange handle the final loading state to avoid premature PrivateRoute redirection.
         if (!window.location.hash.includes('access_token')) {
+          clearTimeout(timeoutId);
           setLoading(false);
-        } else {
-          console.log('[AuthDebug] Auth hash detected, keeping loading true for onAuthStateChange to resolve.');
         }
       }
     };
@@ -139,15 +139,26 @@ export function AuthProvider({ children }) {
 
     // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // ... existing listener logic ... 
-      // For simplicity, we mostly rely on initSession for the first load in this new "Simulation First" approach
-      // But we should update state if real auth happens
-      if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user);
-        localStorage.removeItem('visorx_mode'); // Exit simulation mode if real login happens
+      console.log(`[AuthDebug] Auth State Change: ${event}`);
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          setUser(session.user);
+          await fetchProfile(session.user);
+          localStorage.removeItem('visorx_mode');
+          // Force reload if we were stuck
+          if (window.location.pathname === '/login') {
+            window.location.href = '/dashboard';
+            return;
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setRole(null);
       }
-      setLoading(false); // Ensure loading is cleared after auth check
+
+      setLoading(false);
+      clearTimeout(timeoutId);
     });
 
     return () => {
