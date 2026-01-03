@@ -15,12 +15,9 @@ export function AuthProvider({ children }) {
 
   const fetchProfile = async (sessionUser) => {
     if (!sessionUser) {
-      console.log('[AuthDebug] No session user, clearing role');
       setRole(null);
       return;
     }
-
-    console.log('[AuthDebug] Fetching profile for:', sessionUser.id);
 
     try {
       let { data: profile, error } = await supabase
@@ -30,12 +27,11 @@ export function AuthProvider({ children }) {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('[AuthDebug] Error fetching profile:', error);
+        console.error('[Auth] Error fetching profile:', error);
       }
 
-      // Auto-create profile if missing (backwards compatibility or if trigger failed)
+      // Auto-create profile if missing
       if (!profile) {
-        console.log('[AuthDebug] Profile missing, attempting manual creation...');
         const newRole = sessionUser.email === 'delavega3540@gmail.com' ? 'admin' : 'user';
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
@@ -48,96 +44,38 @@ export function AuthProvider({ children }) {
           .single();
 
         if (!insertError) {
-          console.log('[AuthDebug] Manual profile creation successful:', newProfile);
           profile = newProfile;
-        } else {
-          console.error('[AuthDebug] Manual profile creation failed:', insertError);
         }
-      } else {
-        console.log('[AuthDebug] Profile found:', profile);
       }
 
       if (profile) {
         setRole(profile.role);
       }
     } catch (error) {
-      console.error("[AuthDebug] Unexpected error in fetchProfile:", error);
+      console.error("[Auth] Unexpected error in fetchProfile:", error);
     }
   };
 
   useEffect(() => {
-    console.log('[AuthDebug] AuthProvider initializing...');
-
+    // Check if Supabase is configured
     if (!supabase) {
-      console.warn('[AuthDebug] Supabase client is NOT configured.');
-      // Fallback legacy local mode
+      // Fallback to local mode
       const storedUser = localStorage.getItem('visorx_user');
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
         setUser(parsed);
-        setRole(parsed.email === 'admin@visorx.com' ? 'admin' : 'user');
+        setRole(parsed.role || 'user');
       }
       setLoading(false);
       return;
     }
 
-    // Safety timeout to prevent infinite loading (e.g. network issues)
-    const timeoutId = setTimeout(() => {
-      console.warn('[AuthDebug] Auth init timed out, forcing load completion');
-      setLoading(false);
-    }, 8000);
-
-    // Initial session check
-    // Initial session check
-    const initSession = async () => {
-      // CAPTURE HASH OR CODE (PKCE) BEFORE IT IS STRIPPED
-      const hasAuthHash = window.location.hash && window.location.hash.includes('access_token');
-      const hasAuthCode = window.location.search && window.location.search.includes('code=');
-
-      if (hasAuthHash || hasAuthCode) {
-        console.log('[AuthDebug] Auth Token/Code detected. Entering POLLING MODE.');
-
-        // Polling Strategy: Try to get session for 5 seconds
-        let attempts = 0;
-        const maxAttempts = 15; // Increased timeout for code exchange
-
-        const poll = setInterval(async () => {
-          attempts++;
-          console.log(`[AuthDebug] Polling for session (Attempt ${attempts}/${maxAttempts})...`);
-
-          const { data: { session }, error } = await supabase.auth.getSession();
-
-          if (session?.user) {
-            console.log('[AuthDebug] Polling SUCCESS! Session found.');
-            clearInterval(poll);
-            setUser(session.user);
-            await fetchProfile(session.user);
-            localStorage.removeItem('visorx_mode');
-
-            // CRITICAL: Ensure we stop loading state
-            setLoading(false);
-
-            // Redirect if on login page
-            if (window.location.pathname === '/login') window.location.href = '/dashboard';
-          } else if (attempts >= maxAttempts) {
-            console.warn('[AuthDebug] Polling TIMEOUT. No session found after hash/code.');
-            clearInterval(poll);
-            // Only give up now
-            setLoading(false);
-          }
-        }, 500);
-
-        return; // Skip standard init
-      }
-
-      // STANDARD INIT (No Hash)
+    // Initialize session
+    const initAuth = async () => {
       try {
-        console.log('[AuthDebug] Checking initial session (Standard mode)...');
-
-        // CHECK LOCAL FALLBACK FIRST
+        // Check for local dev user first
         const storedUser = localStorage.getItem('visorx_user');
         if (storedUser) {
-          console.log('[AuthDebug] Found local dev user override');
           const parsed = JSON.parse(storedUser);
           setUser(parsed);
           setRole(parsed.role || 'user');
@@ -145,137 +83,84 @@ export function AuthProvider({ children }) {
           return;
         }
 
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Get current session
+        const { data: { session } } = await supabase.auth.getSession();
 
         if (session?.user) {
-          console.log('[AuthDebug] Supabase Session Found');
           setUser(session.user);
           await fetchProfile(session.user);
-        } else {
-          console.log('[AuthDebug] No session found. Waiting for user action.');
-          setUser(null);
-          setRole(null);
         }
-
       } catch (error) {
-        console.error("[AuthDebug] Auth check failed:", error);
-        setUser(null);
-        setRole(null);
+        console.error('[Auth] Init error:', error);
       } finally {
-        if (!hasAuthHash) {
-          clearTimeout(timeoutId);
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
-    initSession();
+    initAuth();
 
-    // Listen for changes
-    // Listen for changes
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[AuthDebug] Auth State Change: ${event}`);
+      console.log('[Auth] State change:', event);
 
-      const hasAuthHash = window.location.hash && window.location.hash.includes('access_token');
-
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (event === 'SIGNED_IN') {
         if (session?.user) {
           setUser(session.user);
           await fetchProfile(session.user);
           localStorage.removeItem('visorx_mode');
 
-          // Force reload if we were stuck
+          // Redirect to dashboard if on login page
           if (window.location.pathname === '/login') {
             window.location.href = '/dashboard';
-            return;
           }
         }
-        setLoading(false); // Success!
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setRole(null);
-        setLoading(false);
-      } else if (event === 'INITIAL_SESSION') {
-        // CRITICAL FIX: If we have a hash, do NOT accept "null" session yet.
-        // Wait for SIGNED_IN.
-        if (hasAuthHash && !session) {
-          console.log('[AuthDebug] INITIAL_SESSION with hash detected. Ignoring null session to wait for SIGNED_IN.');
-          return;
-        }
-        // Otherwise, standard init
-        if (session?.user) {
-          setUser(session.user);
-          await fetchProfile(session.user);
-        }
-        setLoading(false);
-      } else {
-        // Password recovery, etc.
-        setLoading(false);
       }
 
-      clearTimeout(timeoutId);
+      setLoading(false);
     });
 
     return () => {
       subscription.unsubscribe();
-      clearTimeout(timeoutId);
     };
   }, []);
 
   const signInWithGoogle = async () => {
-    console.log('[AuthDebug] signInWithGoogle triggered');
-
     if (!supabase) {
       toast({ title: "Demo Mode", description: "Google Auth requires Supabase connection." });
       return;
     }
 
     try {
-      // Use origin only. Let App router handle the default forwarding to dashboard.
-      const redirectUrl = window.location.origin;
-      console.log('[AuthDebug] Starting OAuth flow. Redirect URL:', redirectUrl);
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
+          redirectTo: `${window.location.origin}/dashboard`,
         }
       });
 
-      if (data) console.log('[AuthDebug] OAuth data:', data);
-
-      if (error) {
-        console.error('[AuthDebug] OAuth Error:', error);
-        throw error;
-      }
+      if (error) throw error;
     } catch (error) {
-      console.error('[AuthDebug] Catch Block Error:', error);
+      console.error('[Auth] Login error:', error);
       toast({ title: "Login Failed", description: error.message, variant: "destructive" });
     }
   };
 
   const signOut = async () => {
-    console.log('[AuthDebug] Signing out...');
-
     try {
-      // always clear local state
       localStorage.removeItem('visorx_user');
       localStorage.removeItem('visorx_mode');
 
-      // Attempt Supabase sign out but don't block if it fails (e.g. if we are offline/local)
       if (supabase) {
         await supabase.auth.signOut().catch(err => console.warn("Supabase SignOut Warning:", err));
       }
     } catch (error) {
-      console.error("SignOut fatal error:", error);
+      console.error("SignOut error:", error);
     } finally {
       setUser(null);
       setRole(null);
-      // Force hard reload to login page to clear any in-memory state
       window.location.href = '/login';
     }
   };

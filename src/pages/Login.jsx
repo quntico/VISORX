@@ -3,13 +3,12 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
-import { Box as Cube, Shield, Zap, Info } from 'lucide-react';
+import { Box as Cube, Shield, Zap, Info, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/lib/supabase'; // Import supabase for diagnostics
-import { AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'; // Icons
+import { supabase } from '@/lib/supabase';
 
 function Login() {
   const { signInWithGoogle, user, loading } = useAuth();
@@ -17,77 +16,26 @@ function Login() {
   const { toast } = useToast();
   const { t } = useLanguage();
 
-  // --- MANUAL TOKEN HANDLING (RADICAL FIX) ---
-  const [resolvingToken, setResolvingToken] = React.useState(false);
-  const [tokenDebug, setTokenDebug] = React.useState('');
-
   useEffect(() => {
-    const handleHash = async () => {
-      const hash = window.location.hash;
-      if (!hash) return;
+    // Check for OAuth errors in URL
+    const hash = window.location.hash;
+    if (hash && hash.includes('error_description')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const errorDescription = params.get('error_description');
+      toast({
+        title: t('auth.errorTitle'),
+        description: errorDescription?.replace(/\+/g, ' ') || 'Authentication error',
+        variant: "destructive"
+      });
+    }
 
-      // Check for error
-      if (hash.includes('error_description')) {
-        const params = new URLSearchParams(hash.substring(1));
-        const errorDescription = params.get('error_description');
-        console.error('[AuthDebug] URL Hash Error:', errorDescription);
-        toast({
-          title: "Error de Login",
-          description: errorDescription.replace(/\+/g, ' '),
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Check for access token
-      if (hash.includes('access_token')) {
-        console.log('[AuthDebug] Manual Token Detection Triggered');
-        setResolvingToken(true);
-        setTokenDebug('Token detected. Attempting manual exchange...');
-
-        try {
-          // Parse hash manually
-          const params = new URLSearchParams(hash.substring(1));
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
-
-          if (accessToken) {
-            setTokenDebug('Token parsed. Setting session...');
-
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken || ''
-            });
-
-            if (error) throw error;
-
-            if (data.session) {
-              setTokenDebug('Session established! Redirecting...');
-              // Force redirect
-              setTimeout(() => navigate('/dashboard'), 500);
-            } else {
-              throw new Error("Session was null after setSession");
-            }
-          }
-        } catch (err) {
-          console.error("Manual Token Error:", err);
-          setTokenDebug(`Error: ${err.message}`);
-          // Allow user to see error before clearing
-        }
-      }
-    };
-
-    handleHash();
-
-    // Standard user redirection check
-    if (user && !loading && !resolvingToken) {
-      console.log('[AuthDebug] Login page detected user, redirecting to dashboard');
+    // Redirect if user is logged in
+    if (user && !loading) {
       navigate('/dashboard');
     }
   }, [user, loading, navigate, toast, t]);
 
   const handleLoginClick = () => {
-    console.log('[AuthDebug] Login button clicked');
     signInWithGoogle();
   };
 
@@ -99,28 +47,6 @@ function Login() {
       </Helmet>
 
       <div className="min-h-screen bg-[#0B0F14] flex items-center justify-center p-4 relative overflow-hidden">
-
-        {/* RADICAL DEBUG OVERLAY */}
-        {resolvingToken && (
-          <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center text-center p-8">
-            <Loader2 className="h-16 w-16 text-[#29B6F6] animate-spin mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">ANALIZANDO LOGIN (RADICAL MODE)</h2>
-            <p className="text-green-400 font-mono text-sm mb-4 max-w-lg break-all mx-auto">
-              {tokenDebug}
-            </p>
-            <div className="p-4 bg-gray-800 rounded text-xs text-gray-500 font-mono mb-4">
-              Esto evita el rebote automático. Si ves esto, Google respondió correctamente.
-            </div>
-            {/* Panic Button if it gets stuck */}
-            <Button
-              variant="destructive"
-              onClick={() => { window.location.hash = ''; window.location.reload(); }}
-            >
-              Cancelar y Reintentar
-            </Button>
-          </div>
-        )}
-
         {/* Background Grid */}
         <div className="absolute inset-0 opacity-10">
           <div className="h-full w-full" style={{
@@ -130,7 +56,6 @@ function Login() {
         </div>
 
         <motion.div
-          // ... rest of component
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
@@ -174,13 +99,14 @@ function Login() {
               <Button
                 className="w-full bg-white text-gray-900 hover:bg-gray-100 font-semibold h-12"
                 onClick={handleLoginClick}
+                disabled={loading}
               >
                 <img
                   src="https://www.google.com/favicon.ico"
                   alt="Google"
                   className="w-5 h-5 mr-3"
                 />
-                {t('auth.signInButton')}
+                {loading ? 'Iniciando...' : t('auth.signInButton')}
               </Button>
 
               {/* Dev Bypass Button */}
@@ -197,7 +123,6 @@ function Login() {
                 variant="outline"
                 className="w-full border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 h-10 text-xs"
                 onClick={() => {
-                  // Activate Simulation Mode AND Local User
                   localStorage.setItem('visorx_mode', 'simulation');
                   localStorage.setItem('visorx_user', JSON.stringify({
                     id: 'dev_user',
@@ -220,19 +145,18 @@ function Login() {
               </div>
             </div>
           </div>
-        </motion.div >
+        </motion.div>
 
-        {/* DIAGNOSTICS PANEL (New) */}
-        < div className="fixed bottom-4 left-4 right-4 z-50" >
+        {/* Diagnostics Panel */}
+        <div className="fixed bottom-4 left-4 right-4 z-50">
           <DiagnosticsPanel />
-        </div >
-
-      </div >
+        </div>
+      </div>
     </>
   );
 }
 
-// Internal Diagnostics Component
+// Diagnostics Component
 function DiagnosticsPanel() {
   const [isOpen, setIsOpen] = React.useState(false);
   const [sessionStatus, setSessionStatus] = React.useState('Unknown');
