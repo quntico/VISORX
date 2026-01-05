@@ -93,14 +93,18 @@ export function AuthProvider({ children }) {
           if (hasHash) {
             logAuth('OAuth detected! Attempting manual extraction...');
 
-            // MANUAL HASH PARSING
+            // MANUAL HASH (IMPLICIT) OR CODE (PKCE) PARSING
             const hash = window.location.hash;
+            const search = window.location.search;
             const params = new URLSearchParams(hash.replace('#', ''));
+            const searchParams = new URLSearchParams(search);
+
             const access_token = params.get('access_token');
             const refresh_token = params.get('refresh_token');
+            const code = searchParams.get('code');
 
             if (access_token && refresh_token) {
-              logAuth('Manual Token Found. Forcing Session...');
+              logAuth('Manual Token (Implicit) Found. Forcing Session...');
               const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
 
               if (!error && data.session) {
@@ -110,6 +114,20 @@ export function AuthProvider({ children }) {
                 window.history.replaceState(null, '', window.location.pathname); // Clear hash
                 setLoading(false);
                 return; // Done
+              }
+            } else if (code) {
+              logAuth('Manual Code (PKCE) Found. Exchanging...');
+              const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+              if (!error && data.session) {
+                logAuth('Manual Code Exchange Success!');
+                setUser(data.session.user);
+                await fetchProfile(data.session.user);
+                window.history.replaceState(null, '', window.location.pathname);
+                setLoading(false);
+                return;
+              } else {
+                logAuth(`Code Exchange Failed: ${error?.message}`);
               }
             }
 
