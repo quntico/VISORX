@@ -74,13 +74,16 @@ export async function createProject(projectData, authUser = null) {
       created_at: new Date().toISOString()
     };
 
-    const promise = supabase
-      .from('projects')
-      .insert(payload)
-      .select()
-      .single();
+    // RPC REQUEST (Bypasses Table API / RLS)
+    const promise = supabase.rpc('create_project_safe', {
+      p_name: projectData.name,
+      p_description: projectData.description,
+      p_user_id: user.id
+    });
 
-    const { data, error } = await withTimeout(promise, 25000, 'projects.insert');
+    // Note: RPC returns 'data' directly, not structured as {data, error} in the promise result usually, 
+    // but allow Supabase client normalization.
+    const { data, error } = await withTimeout(promise, 25000, 'rpc.create_project_safe');
 
     if (error) {
       alert(`DB Error (Projects): ${error.message} - Code: ${error.code}`);
