@@ -478,13 +478,53 @@ function Converter() {
     return (
         <div className="min-h-screen bg-[#0B0F14] text-white flex flex-col h-screen overflow-hidden">
 
-            {/* DEBUG CONSOLE (Temporary) */}
-            <div className="absolute top-0 right-0 z-[10000] bg-black/80 border border-red-500/50 p-2 text-[10px] font-mono pointer-events-none opacity-50 hover:opacity-100 transition-opacity max-w-sm overflow-hidden text-red-200">
-                <p>Status: {loading ? "Loading..." : user ? "ONLINE" : "OFFLINE"}</p>
-                <p>Hash: {window.location.hash.substring(0, 20)}...</p>
-                <p>Search: {window.location.search}</p>
-                <p>User ID: {user?.id || 'null'}</p>
-                <p>Url: {window.location.href.split('site')[1]}</p>
+            {/* DEBUG CONSOLE (Fixed Visibility) */}
+            <div className="fixed top-24 right-4 z-[99999] bg-zinc-950 border-2 border-red-500 p-4 rounded-lg shadow-2xl text-xs font-mono text-white w-72 backdrop-blur-sm">
+                <h3 className="font-bold border-b border-red-500/30 pb-1 mb-2 text-red-400 flex justify-between items-center">
+                    <span>DEBUGGER v3.2</span>
+                    <span className={user ? "text-green-400" : "text-red-500"}>●</span>
+                </h3>
+
+                <div className="space-y-2 mb-4">
+                    <div className="flex justify-between">
+                        <span className="text-gray-500">Status:</span>
+                        <span className={user ? "text-green-400" : "text-red-400"}>{loading ? "LOADING" : user ? "ONLINE" : "OFFLINE"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-gray-500">User ID:</span>
+                        <span className="text-blue-300">{user?.id?.substring(0, 8) || 'NULL'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-gray-500">Hash:</span>
+                        <span className="text-amber-300 break-all">{window.location.hash.substring(0, 10) || 'EMPTY'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-gray-500">Params:</span>
+                        <span className="text-amber-300">{window.location.search || 'EMPTY'}</span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <button
+                        onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } })}
+                        className="bg-red-900/50 hover:bg-red-700 border border-red-700 text-red-100 p-2 rounded transition-colors"
+                    >
+                        LOGIN
+                    </button>
+                    <button
+                        onClick={() => {
+                            const info = `
+                            URL: ${window.location.href}
+                            LS-Token: ${localStorage.getItem('sb-uufffrsgpdcocosfukjm-auth-token') ? 'FOUND' : 'MISSING'}
+                            Session: ${JSON.stringify(user || 'null')}
+                            `;
+                            alert(info);
+                        }}
+                        className="bg-blue-900/50 hover:bg-blue-700 border border-blue-700 text-blue-100 p-2 rounded transition-colors"
+                    >
+                        INSPECT
+                    </button>
+                </div>
             </div>
 
             {/* Header */}
