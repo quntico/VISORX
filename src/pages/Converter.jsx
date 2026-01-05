@@ -484,7 +484,14 @@ function Converter() {
                         <Button variant="ghost" onClick={() => navigate('/dashboard')}>
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
-                        <h1 className="text-xl font-bold">Toolkit & Convertidor</h1>
+                        <div className="flex flex-col">
+                            <h1 className="text-xl font-bold flex items-center gap-2">
+                                Toolkit & Convertidor
+                                <span className="bg-blue-900/50 text-blue-200 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 font-mono">
+                                    v3.2.0 (PKCE)
+                                </span>
+                            </h1>
+                        </div>
 
                         {/* INDICATORS (New) */}
                         <div
