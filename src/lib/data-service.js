@@ -5,18 +5,24 @@ const DEFAULT_BUCKETS = ['models', 'assets', 'uploads'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function withTimeout(promise, ms, label = 'operation') {
-  let t;
-  const timeout = new Promise((_, rej) => {
-    t = setTimeout(() => rej(new Error(`Timeout in ${label} after ${ms}ms`)), ms);
-  });
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    clearTimeout(t);
-  }
-}
+// Helper to timeout promises (Extended to 20s for slow connections/cold starts)
+const withTimeout = (promise, ms = 20000, label = 'operation') => {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Timeout in ${label} after ${ms}ms`));
+    }, ms);
 
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+};
 async function retry(fn, { retries = 3, baseDelayMs = 500, label = 'task' } = {}) {
   let lastErr;
   for (let i = 0; i < retries; i++) {
