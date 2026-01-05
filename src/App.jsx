@@ -1,72 +1,42 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from '@/components/ui/toaster';
-import Login from '@/pages/Login';
-import Dashboard from '@/pages/Dashboard';
-import Converter from '@/pages/Converter';
-import Project from '@/pages/Project';
-import ModelView from '@/pages/ModelView';
-import PublicViewer from '@/pages/PublicViewer';
-import SetupAdmin from '@/pages/SetupAdmin';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { LanguageProvider } from '@/contexts/LanguageContext';
+import Converter from '@/pages/Converter'; // Safe Mode
+import { LanguageProvider } from '@/contexts/LanguageContext'; // Safe Mode
+import { AuthProvider } from '@/contexts/AuthContext';
+import Dashboard from '@/pages/Dashboard'; // RESTORING DASHBOARD
+import Login from '@/pages/Login'; // RESTORING LOGIN
 import { DebugErrorBoundary } from '@/components/DebugErrorBoundary';
-import { Loader2 } from 'lucide-react';
 
-function LoadingScreen() {
-  return (
-    <div className="min-h-screen bg-[#0B0F14] flex items-center justify-center">
-      <Loader2 className="h-8 w-8 text-[#29B6F6] animate-spin" />
-    </div>
-  );
-}
-
-function PrivateRoute({ children }) {
-  const { user, loading } = useAuth();
-
-  if (loading) return <LoadingScreen />;
-  return user ? children : <Navigate to="/login" />;
-}
-
-function AdminRoute({ children }) {
-  const { user, role, loading } = useAuth();
-
-  if (loading) return <LoadingScreen />;
-
-  if (!user) return <Navigate to="/login" />;
-  if (role !== 'admin') {
-    // User is logged in but not admin. Redirect to dashboard with a warning?
-    // For now just redirect to dashboard
-    return <Navigate to="/dashboard" />;
-  }
-
-  return children;
-}
-
+// STAGE 21: FULL APP SKELETON (Providers + Dashboard + Green Converter)
 function App() {
   return (
     <LanguageProvider>
       <AuthProvider>
         <Router>
+          {/* Removed Debug Bar - Going for Real UI */}
           <Routes>
+            {/* PUBLIC */}
             <Route path="/login" element={<Login />} />
 
-            {/* Admin Only */}
-            <Route path="/setup" element={<AdminRoute><DebugErrorBoundary><SetupAdmin /></DebugErrorBoundary></AdminRoute>} />
+            {/* PRIVATE (Direct access for now) */}
+            <Route path="/dashboard" element={<Dashboard />} />
 
-            {/* Authenticated Users */}
-            <Route path="/dashboard" element={<PrivateRoute><DebugErrorBoundary><Dashboard /></DebugErrorBoundary></PrivateRoute>} />
-            <Route path="/converter" element={<PrivateRoute><DebugErrorBoundary><Converter /></DebugErrorBoundary></PrivateRoute>} />
-            <Route path="/project/:id" element={<PrivateRoute><DebugErrorBoundary><Project /></DebugErrorBoundary></PrivateRoute>} />
-            <Route path="/model/:id" element={<PrivateRoute><DebugErrorBoundary><ModelView /></DebugErrorBoundary></PrivateRoute>} />
+            {/* CONVERTER */}
+            <Route path="/project/:id" element={
+              <DebugErrorBoundary>
+                <Converter />
+              </DebugErrorBoundary>
+            } />
+            <Route path="/converter" element={
+              <DebugErrorBoundary>
+                <Converter />
+              </DebugErrorBoundary>
+            } />
 
-            {/* Public Access */}
-            <Route path="/v/:token" element={<PublicViewer />} />
-
-            <Route path="/" element={<Navigate to="/dashboard" />} />
+            {/* FALLBACKS */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
-          <Toaster />
         </Router>
       </AuthProvider>
     </LanguageProvider>

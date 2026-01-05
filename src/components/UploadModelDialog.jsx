@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Upload, AlertCircle, CheckCircle, Loader2, FileType } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import * as THREE from 'three';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 function UploadModelDialog({ open, onOpenChange, onSubmit }) {
   const [name, setName] = useState('');

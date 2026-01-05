@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
-import { setRecoveryToken } from '@/lib/data-service';
 
 const AuthContext = createContext({});
 
@@ -14,8 +13,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const processingHash = useRef(false);
-
   const logAuth = (msg) => {
     const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
     const log = `[${timestamp}] ${msg}`;
@@ -24,7 +21,7 @@ export function AuthProvider({ children }) {
       const history = JSON.parse(localStorage.getItem('auth_debug_log') || '[]');
       history.unshift(log);
       localStorage.setItem('auth_debug_log', JSON.stringify(history.slice(0, 50)));
-    } catch (e) { console.error('Log error', e); }
+    } catch (e) { }
   };
 
   const fetchProfile = async (sessionUser) => {
@@ -32,7 +29,6 @@ export function AuthProvider({ children }) {
       setRole(null);
       return;
     }
-
     try {
       let { data: profile, error } = await supabase
         .from('profiles')
@@ -40,247 +36,130 @@ export function AuthProvider({ children }) {
         .eq('id', sessionUser.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        logAuth(`Error fetching profile: ${error.message}`);
-      }
-
-      if (!profile) {
-        logAuth('Profile missing. Creating new profile...');
+      if (!profile && (!error || error.code === 'PGRST116')) {
         const newRole = sessionUser.email === 'delavega3540@gmail.com' ? 'admin' : 'user';
-        const { data: newProfile, error: insertError } = await supabase
+        const { data: newProfile } = await supabase
           .from('profiles')
-          .insert([{
-            id: sessionUser.id,
-            email: sessionUser.email,
-            role: newRole
-          }])
-          .select()
-          .single();
-
-        if (!insertError) {
-          profile = newProfile;
-          logAuth('Profile created successfully.');
-        } else {
-          logAuth(`Error creating profile: ${insertError.message}`);
-        }
+          .insert([{ id: sessionUser.id, email: sessionUser.email, role: newRole }])
+          .select().single();
+        if (newProfile) profile = newProfile;
       }
-
-      if (profile) {
-        setRole(profile.role);
-      }
+      if (profile) setRole(profile.role);
     } catch (error) {
-      logAuth(`Unexpected error in fetchProfile: ${error.message}`);
+      console.error(error);
     }
   };
 
   useEffect(() => {
-    if (!supabase) {
-      const storedUser = localStorage.getItem('visorx_user');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        setUser(parsed);
-        setRole(parsed.role || 'user');
-      }
-      setLoading(false);
-      return;
-    }
-
-    const safetyTimeout = setTimeout(() => {
-      setLoading(prev => {
-        if (prev) {
-          logAuth('SAFETY TIMEOUT: Forcing loading=false (8s expired)');
-          return false;
-        }
-        return prev;
-      });
-    }, 8000);
+    if (!supabase) { setLoading(false); return; }
 
     const initAuth = async () => {
+      logAuth('Init: v5.0 - Hash Protection');
+
+      // Check for OAuth Hash/Code
+      const hasHash = window.location.hash.includes('access_token') ||
+        window.location.search.includes('code=');
+
       try {
-        logAuth('Auth Init Started (v3.0 - Fallback Mode)');
+        // Race getSession against a 4s timeout to prevent infinite loading
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Auth Timeout")), 4000)
+        );
 
-        const storedUser = localStorage.getItem('visorx_user');
-        if (storedUser) {
-          logAuth('Found local dev user in localStorage');
-          const parsed = JSON.parse(storedUser);
-          setUser(parsed);
-          setRole(parsed.role || 'user');
-          setLoading(false);
-          return;
-        }
-
-        const hash = window.location.hash;
-        if (hash && hash.includes('access_token')) {
-          logAuth(`Hash detected: ${hash.substring(0, 30)}...`);
-          processingHash.current = true;
-
-          const params = new URLSearchParams(hash.substring(1));
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
-
-          if (accessToken) {
-            logAuth('Attempting setSession...');
-
-            try {
-              // 1. Try setSession with timeout
-              const sessionPromise = supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken || ''
-              });
-
-              const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('setSession_TIMEOUT')), 3000)
-              );
-
-              const result = await Promise.race([sessionPromise, timeoutPromise]);
-              const { data: { session }, error } = result;
-
-              if (error) throw error;
-
-              if (session?.user) {
-                logAuth('setSession SUCCESS.');
-                setUser(session.user);
-                await fetchProfile(session.user);
-                finalizeLogin();
-              }
-            } catch (err) {
-              logAuth(`setSession FAILED: ${err.message}. Trying Fallback: getUser...`);
-
-              // 2. FALLBACK: Create user from token stateless
-              try {
-                const { data: { user: fallbackUser }, error: getUserError } = await supabase.auth.getUser(accessToken);
-
-                if (getUserError) throw getUserError;
-
-                if (fallbackUser) {
-                  logAuth('Fallback getUser SUCCESS.');
-                  setRecoveryToken(accessToken);
-                  setUser(fallbackUser);
-                  await fetchProfile(fallbackUser);
-                  // Manually persist if possible (optional, but good for refresh)
-                  finalizeLogin();
-                } else {
-                  logAuth('Fallback getUser returned null.');
-                  processingHash.current = false;
-                }
-              } catch (fallbackErr) {
-                logAuth(`Fallback FAILED: ${fallbackErr.message}`);
-                processingHash.current = false;
-              }
-            }
-          } else {
-            processingHash.current = false;
-          }
-        } else {
-          logAuth('No access_token in hash.');
-        }
-
-        logAuth('Checking standard supabase.auth.getSession()...');
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
 
         if (session?.user) {
-          logAuth(`Standard getSession FOUND user: ${session.user.email}`);
+          logAuth(`Session Found: ${session.user.email}`);
           setUser(session.user);
           await fetchProfile(session.user);
-        } else {
-          logAuth('Standard getSession returned NO user.');
-        }
-      } catch (error) {
-        logAuth(`Init CRITICAL ERROR: ${error.message}`);
-      } finally {
-        if (!processingHash.current) {
-          logAuth('Setting loading = false (Init complete)');
+
+          // Clear hash safely
+          if (hasHash) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+
+          // Redirect if on login
+          if (window.location.pathname === '/login') {
+            window.location.replace('/dashboard');
+          }
+
+          // Safe to stop loading
           setLoading(false);
         } else {
-          logAuth('Keeping loading = true (Hash processing logic active)');
-        }
-      }
-    };
+          // NO SESSION FOUND
+          logAuth('No active session.');
 
-    const finalizeLogin = () => {
-      setLoading(false);
-      window.location.hash = '';
-      if (window.location.pathname === '/login') {
-        logAuth('Redirecting to dashboard...');
-        window.location.href = '/dashboard';
+          if (hasHash) {
+            logAuth('OAuth detected! WAITING for Supabase Event...');
+            // CRITICAL: DO NOT set loading(false) yet.
+            // Wait for onAuthStateChange to fire.
+            // Set a fallback timeout just in case it fails.
+            setTimeout(() => {
+              logAuth('Hash Wait Timeout. Forcing load finish.');
+              setLoading((prev) => {
+                if (prev) return false; // Only unset if still loading
+                return prev;
+              });
+            }, 6000);
+          } else {
+            // Check local storage fallbacks (Dev User)
+            const storedUser = localStorage.getItem('visorx_user');
+            if (storedUser && (storedUser.includes('dev_user') || storedUser.includes('sim_user'))) {
+              const parsed = JSON.parse(storedUser);
+              setUser(parsed);
+              setRole(parsed.role || 'user');
+            }
+            setLoading(false);
+          }
+        }
+      } catch (e) {
+        logAuth(`Init Error: ${e.message}`);
+        setLoading(false);
       }
-      processingHash.current = false;
     };
 
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      logAuth(`Supabase Event: ${event}`);
+      logAuth(`Event: ${event}`);
 
-      if (processingHash.current && event === 'SIGNED_OUT') {
-        logAuth('IGNORING SIGNED_OUT due to lock');
-        return;
-      }
+      if (session?.user) {
+        setUser(session.user);
+        await fetchProfile(session.user);
 
-      if (event === 'SIGNED_IN') {
-        if (session?.user) {
-          logAuth(`SIGNED_IN event with user: ${session.user.email}`);
-          setUser(session.user);
-          await fetchProfile(session.user);
-          localStorage.removeItem('visorx_mode');
+        if (loading) setLoading(false); // Unblock if waiting
 
-          if (window.location.pathname === '/login') {
-            window.location.href = '/dashboard';
-          }
+        if (window.location.pathname === '/login') {
+          window.location.replace('/dashboard');
         }
       } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setRole(null);
+        // Protect dev user
+        const storedUser = localStorage.getItem('visorx_user');
+        if (!storedUser?.includes('dev_user')) {
+          setUser(null);
+          setRole(null);
+        }
+        setLoading(false);
       }
-
-      setLoading(false);
     });
 
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(safetyTimeout);
-    };
-  }, []);
+    return () => subscription.unsubscribe();
+  }, []); // Remove dependencies to prevent re-runs
 
   const signInWithGoogle = async () => {
-    logAuth('User clicked SignInWithGoogle');
-    if (!supabase) {
-      toast({ title: "Demo Mode", description: "Google Auth requires Supabase connection." });
-      return;
-    }
-
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-        }
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      logAuth(`SignIn ERROR: ${error.message}`);
-      console.error('[Auth] Login error:', error);
-      toast({ title: "Login Failed", description: error.message, variant: "destructive" });
-    }
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/dashboard` }
+    });
   };
 
   const signOut = async () => {
-    logAuth('User clicked SignOut');
-    try {
-      localStorage.removeItem('visorx_user');
-      localStorage.removeItem('visorx_mode');
-
-      if (supabase) {
-        await supabase.auth.signOut().catch(err => console.warn("Supabase SignOut Warning:", err));
-      }
-    } catch (error) {
-      console.error("SignOut error:", error);
-    } finally {
-      setUser(null);
-      setRole(null);
-      window.location.href = '/login';
-    }
+    localStorage.removeItem('visorx_user');
+    await supabase.auth.signOut();
+    setUser(null);
+    setRole(null);
+    window.location.href = '/login';
   };
 
   const value = {

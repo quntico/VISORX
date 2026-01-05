@@ -15,27 +15,17 @@ function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [isLoggingIn, setIsLoggingIn] = React.useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  // Fallback Redirect: If AuthContext has a user, do not stay on Login
   useEffect(() => {
-    // Check for OAuth errors in URL
-    const hash = window.location.hash;
-    if (hash && hash.includes('error_description')) {
-      const params = new URLSearchParams(hash.substring(1));
-      const errorDescription = params.get('error_description');
-      toast({
-        title: t('auth.errorTitle'),
-        description: errorDescription?.replace(/\+/g, ' ') || 'Authentication error',
-        variant: "destructive"
-      });
-      setIsLoggingIn(false);
-    }
-
-    // Redirect if user is logged in
-    if (user && !loading) {
+    if (user) {
       navigate('/dashboard');
     }
-  }, [user, loading, navigate, toast, t]);
+  }, [user, navigate]);
 
   const handleLoginClick = async () => {
     setIsLoggingIn(true);
@@ -46,6 +36,47 @@ function Login() {
       toast({
         title: "Error",
         description: "No se pudo iniciar sesión. Por favor intenta de nuevo.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEmailAuth = async (e) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    try {
+      if (isRegistering) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        toast({
+          title: "Registro Exitoso",
+          description: "Cuenta creada. Verifica si iniciaste sesión automáticamente.",
+          className: "bg-green-500/10 border-green-500/50 text-green-200"
+        });
+        setIsRegistering(false);
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+      }
+    } catch (error) {
+      setIsLoggingIn(false);
+      let errorMsg = error.message;
+
+      if (error.message.includes("Invalid login credentials")) {
+        errorMsg = "Credenciales incorrectas. ¿Ya creaste tu cuenta en la pestaña 'Registrarse'?";
+      } else if (error.message.includes("Email not confirmed")) {
+        errorMsg = "Tu correo no ha sido confirmado. Por favor revisa tu bandeja de entrada.";
+      }
+
+      toast({
+        title: isRegistering ? "Error de Registro" : "Error de Acceso",
+        description: errorMsg,
         variant: "destructive"
       });
     }
@@ -75,37 +106,82 @@ function Login() {
         >
           <div className="bg-[#151B23] border border-[#29B6F6]/20 rounded-lg p-8 shadow-2xl">
             {/* Logo */}
-            <div className="flex items-center justify-center mb-8">
+            <div className="flex items-center justify-center mb-6">
               <div className="relative">
                 <Cube className="h-12 w-12 text-[#29B6F6]" strokeWidth={1.5} />
                 <div className="absolute inset-0 bg-[#29B6F6] blur-xl opacity-30"></div>
               </div>
               <div className="ml-3">
                 <h1 className="text-2xl font-bold text-white">VISOR-X</h1>
-                <p className="text-xs text-[#29B6F6]">v3.1-DataFix</p>
-              </div>
-            </div>
-
-            {/* Features */}
-            <div className="grid grid-cols-3 gap-3 mb-8">
-              <div className="bg-[#0B0F14] border border-[#29B6F6]/10 rounded p-3 text-center">
-                <Shield className="h-5 w-5 text-[#29B6F6] mx-auto mb-1" />
-                <p className="text-xs text-gray-400">Secure</p>
-              </div>
-              <div className="bg-[#0B0F14] border border-[#29B6F6]/10 rounded p-3 text-center">
-                <Cube className="h-5 w-5 text-[#29B6F6] mx-auto mb-1" />
-                <p className="text-xs text-gray-400">AR Ready</p>
-              </div>
-              <div className="bg-[#0B0F14] border border-[#29B6F6]/10 rounded p-3 text-center">
-                <Zap className="h-5 w-5 text-[#29B6F6] mx-auto mb-1" />
-                <p className="text-xs text-gray-400">Fast</p>
+                <p className="text-xs text-[#29B6F6]">v3.2-SecureAuth</p>
               </div>
             </div>
 
             <div className="space-y-6">
-              <div className="text-center">
-                <h2 className="text-xl font-semibold text-white mb-2">{t('auth.loginTitle')}</h2>
-                <p className="text-sm text-gray-400">{t('auth.loginSubtitle')}</p>
+              <div className="flex justify-center mb-6 border-b border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setIsRegistering(false)}
+                  className={`pb-2 px-4 text-sm font-medium transition-colors ${!isRegistering ? 'text-[#29B6F6] border-b-2 border-[#29B6F6]' : 'text-gray-500 hover:text-gray-300'}`}
+                >
+                  Iniciar Sesión
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsRegistering(true)}
+                  className={`pb-2 px-4 text-sm font-medium transition-colors ${isRegistering ? 'text-[#29B6F6] border-b-2 border-[#29B6F6]' : 'text-gray-500 hover:text-gray-300'}`}
+                >
+                  Registrarse
+                </button>
+              </div>
+
+              <div className="text-center mb-4">
+                <h2 className="text-xl font-semibold text-white mb-2">
+                  {isRegistering ? 'Crear Cuenta' : t('auth.loginTitle')}
+                </h2>
+                <p className="text-sm text-gray-400">
+                  {isRegistering ? 'Crea una cuenta para subir proyectos' : 'Accede a tu cuenta existente'}
+                </p>
+              </div>
+
+              {/* Email/Password Form */}
+              <form onSubmit={handleEmailAuth} className="space-y-3">
+                <div>
+                  <input
+                    type="email"
+                    placeholder="Correo Electrónico"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-[#0B0F14] border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-[#29B6F6] focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <input
+                    type="password"
+                    placeholder="Contraseña"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-[#0B0F14] border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-[#29B6F6] focus:outline-none"
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={isLoggingIn || !email || !password}
+                  className="w-full bg-[#29B6F6] hover:bg-[#29B6F6]/90 text-black font-bold h-10"
+                >
+                  {isLoggingIn ? 'Procesando...' : (isRegistering ? 'Registrarse y Entrar' : 'Iniciar con Correo')}
+                </Button>
+              </form>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-gray-700" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-[#151B23] px-2 text-gray-500">O continúa con</span>
+                </div>
               </div>
 
               <Button
@@ -118,52 +194,64 @@ function Login() {
                   alt="Google"
                   className="w-5 h-5 mr-3"
                 />
-                {isLoggingIn ? 'Iniciando...' : t('auth.signInButton')}
+                Google
               </Button>
 
-              {/* Dev Bypass Button */}
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-white/10" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-[#151B23] px-2 text-gray-500">Dev Options</span>
-                </div>
+              {/* Guest/Bypass Login */}
+              <div className="pt-4 border-t border-gray-800 mt-4">
+                <p className="text-xs text-center text-gray-500 mb-3">¿Problemas para iniciar sesión?</p>
+                <Button
+                  variant="outline"
+                  className="w-full border-green-500/30 text-green-400 hover:bg-green-500/10 h-10 text-xs"
+                  onClick={() => {
+                    localStorage.setItem('visorx_mode', 'simulation');
+                    localStorage.setItem('visorx_user', JSON.stringify({
+                      id: 'dev_user',
+                      email: 'admin@local.test',
+                      role: 'admin', // GRANTING ADMIN ACCESS
+                      app_metadata: {},
+                      user_metadata: { full_name: 'Admin de Emergencia' }
+                    }));
+                    window.location.reload();
+                  }}
+                >
+                  ⚡ Acceso Admin (Emergencia/Sin Correo)
+                </Button>
+                <p className="text-[10px] text-center text-gray-600 mt-2">
+                  * Úsalo si no recibes el correo de confirmación.
+                </p>
               </div>
 
-              <Button
-                variant="outline"
-                className="w-full border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 h-10 text-xs"
-                onClick={() => {
-                  localStorage.setItem('visorx_mode', 'simulation');
-                  localStorage.setItem('visorx_user', JSON.stringify({
-                    id: 'dev_user',
-                    email: 'demo@visorx.com',
-                    role: 'admin',
-                    app_metadata: {},
-                    user_metadata: { full_name: 'Evaluador' }
-                  }));
-                  window.location.reload();
-                }}
-              >
-                ⚡ Acceso Rápido (Bypass Login)
-              </Button>
-
-              <div className="bg-[#29B6F6]/10 border border-[#29B6F6]/20 rounded p-3 flex items-start gap-3">
+              <div className="bg-[#29B6F6]/10 border border-[#29B6F6]/20 rounded p-3 flex items-start gap-3 mt-4">
                 <Info className="h-5 w-5 text-[#29B6F6] shrink-0 mt-0.5" />
                 <p className="text-xs text-[#29B6F6] leading-relaxed">
                   Admin access is granted automatically for authorized emails.
                 </p>
               </div>
+
+              {/* Cache Cleaner */}
+              <div className="mt-8 text-center border-t border-gray-800 pt-4">
+                <button
+                  onClick={() => {
+                    if (confirm("¿Estás seguro? Esto borrará tus credenciales guardadas.")) {
+                      localStorage.clear();
+                      window.location.reload();
+                    }
+                  }}
+                  className="text-[10px] text-gray-600 hover:text-red-500 underline"
+                >
+                  ¿Problemas persistentes? Borrar caché y recargar
+                </button>
+              </div>
             </div>
           </div>
-        </motion.div>
+        </motion.div >
 
         {/* Diagnostics Panel - Persistent */}
-        <div className="fixed bottom-4 left-4 right-4 z-50">
+        < div className="fixed bottom-4 left-4 right-4 z-50" >
           <DiagnosticsPanel />
-        </div>
-      </div>
+        </div >
+      </div >
     </>
   );
 }
