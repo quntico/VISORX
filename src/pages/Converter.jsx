@@ -161,7 +161,7 @@ function Converter() {
             await saveModelFlow({
                 file: fileToUpload,
                 selectedProjectId: targetProjectId,
-                // Pass extra metadata if needed
+                authUser: user, // <--- EXPLICITLY PASS THE AUTH USER
                 onStep: (info) => {
                     setUploadStatus(info.message);
                     setProgress(Math.round((info.step / info.total) * 100));
