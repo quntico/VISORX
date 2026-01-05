@@ -80,7 +80,7 @@ export async function createProject(projectData, authUser = null) {
       .select()
       .single();
 
-    const { data, error } = await withTimeout(promise, 5000, 'projects.insert');
+    const { data, error } = await withTimeout(promise, 25000, 'projects.insert');
 
     if (error) {
       alert(`DB Error (Projects): ${error.message} - Code: ${error.code}`);
