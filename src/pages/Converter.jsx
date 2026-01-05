@@ -81,7 +81,7 @@ function Converter() {
     const loadAllData = async () => {
         setLibraryError(null);
         try {
-            const projs = await listProjects();
+            const projs = await listProjects(user);
             setProjects(projs);
 
             // Polyfill for models (since data-service might not export it yet)
