@@ -52,24 +52,40 @@ export async function listProjects(authUser = null) {
   return data ?? [];
 }
 
-export async function createProject({ name, description }, authUser = null) {
-  const user = await requireUser(authUser);
-  const payload = {
-    name: name || 'Proyecto',
-    description: description || 'Proyecto creado automáticamente',
-    user_id: user.id,
-    status: 'active',
-    last_error: null
-  };
+// CREATE PROJECT
+export async function createProject(projectData, authUser = null) {
+  try {
+    const user = await requireUser(authUser);
 
-  const { data, error } = await supabase
-    .from('projects')
-    .insert(payload)
-    .select()
-    .single();
+    // DEBUG ALERT
+    console.log('Creating project for user:', user.id);
 
-  if (error) throw error;
-  return data;
+    const payload = {
+      name: projectData.name,
+      description: projectData.description,
+      user_id: user.id,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    };
+
+    const promise = supabase
+      .from('projects')
+      .insert(payload)
+      .select()
+      .single();
+
+    const { data, error } = await withTimeout(promise, 5000, 'projects.insert');
+
+    if (error) {
+      alert(`DB Error (Projects): ${error.message} - Code: ${error.code}`);
+      throw error;
+    }
+
+    return data;
+  } catch (err) {
+    alert(`Fatal Project Error: ${err.message}`);
+    throw err;
+  }
 }
 
 export async function markProjectError(projectId, message) {
