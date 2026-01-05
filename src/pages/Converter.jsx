@@ -443,6 +443,38 @@ function Converter() {
         };
     }, [activeTab]);
 
+    // ==================== TRANSFORM LOGIC (RESTORED) ====================
+    useEffect(() => {
+        if (!modelObject) return;
+
+        // Apply Rotation
+        modelObject.rotation.y = rotation;
+
+        // Apply Position (Height)
+        modelObject.position.y = verticalPos;
+
+        // Apply Color (Traverse)
+        if (isRxMode && color) {
+            modelObject.traverse((child) => {
+                if (child.isMesh) {
+                    // Clone material to avoid affecting shared resources
+                    if (!child.userData.originalMaterial) child.userData.originalMaterial = child.material.clone();
+
+                    const newMat = child.userData.originalMaterial.clone();
+                    newMat.color.set(color);
+                    child.material = newMat;
+                }
+            });
+        }
+    }, [rotation, verticalPos, color, modelObject, isRxMode]);
+
+    const resetCamera = () => {
+        if (controlsRef.current) controlsRef.current.reset();
+        setRotation(0);
+        setVerticalPos(0);
+        setColor("#ffffff");
+    };
+
     return (
         <div className="min-h-screen bg-[#0B0F14] text-white flex flex-col h-screen overflow-hidden">
             {/* Header */}
@@ -497,128 +529,214 @@ function Converter() {
             </header>
 
             <div className="flex-1 flex overflow-hidden">
-                {/* 3D View */}
-                <div
-                    className="flex-1 relative bg-black/50"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                        e.preventDefault();
-                        const files = Array.from(e.dataTransfer.files);
-                        if (files.length > 0) processFiles(files);
-                    }}
-                >
-                    {/* Dedicated Three.js Container - React touches this ONLY via ref, never children */}
-                    <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
+    // ==================== TRANSFORM LOGIC (RESTORED) ====================
+    useEffect(() => {
+        if (!modelObject) return;
 
-                    {/* React Overlay - Safe to render/unrender */}
-                    {!modelObject && (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none">
-                            <p>Arrastra un archivo aquí o usa "Subir ZIP"</p>
-                        </div>
-                    )}
-                </div>
+                // Apply Rotation
+                modelObject.rotation.y = rotation;
 
-                {/* Library Sidebar */}
-                {showLibrary && (
-                    <div className="w-80 border-l border-white/10 bg-[#151B23] p-4 overflow-y-auto flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold">Tu Librería</h3>
-                            <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading}>
-                                <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                            </Button>
-                        </div>
+                // Apply Position (Height)
+                modelObject.position.y = verticalPos;
 
-                        {/* Error Message */}
-                        {libraryError && (
-                            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded mb-4 text-xs text-red-200">
-                                ⚠️ {libraryError}
-                            </div>
-                        )}
+                // Apply Color (Traverse)
+                if (isRxMode && color) {
+                    modelObject.traverse((child) => {
+                        if (child.isMesh) {
+                            // Clone material to avoid affecting shared resources
+                            if (!child.userData.originalMaterial) child.userData.originalMaterial = child.material.clone();
 
-                        {/* Projects / Models List */}
-                        <div className="space-y-4 flex-1">
-                            {userModels.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    <BoxIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">No tienes modelos guardados.</p>
-                                    <p className="text-xs mt-1">Sube uno para empezar.</p>
+                            const newMat = child.userData.originalMaterial.clone();
+                            newMat.color.set(color);
+                            child.material = newMat;
+                        }
+                    });
+        }
+    }, [rotation, verticalPos, color, modelObject, isRxMode]);
+
+    const resetCamera = () => {
+        if (controlsRef.current) controlsRef.current.reset();
+                setRotation(0);
+                setVerticalPos(0);
+                setColor("#ffffff");
+    };
+
+                return (
+                <div className="min-h-screen bg-[#0B0F14] text-white flex flex-col h-screen overflow-hidden">
+                    {/* ... Header ... */}
+
+                    <div className="flex-1 flex overflow-hidden">
+                        {/* 3D View */}
+                        <div
+                            className="flex-1 relative bg-black/50"
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                const files = Array.from(e.dataTransfer.files);
+                                if (files.length > 0) processFiles(files);
+                            }}
+                        >
+                            {/* Three.js Container */}
+                            <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
+
+                            {/* React Overlay - Empty State */}
+                            {!modelObject && (
+                                <div className="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none">
+                                    <p>Arrastra un archivo aquí o usa "Subir ZIP"</p>
                                 </div>
-                            ) : (
-                                userModels.map(m => (
-                                    <div key={m.id} className="p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer group" onClick={() => handleLoadModel(m)}>
-                                        <div className="flex justify-between">
-                                            <p className="font-medium truncate" title={m.name || m.file_name}>
-                                                {m.name || m.file_name}
-                                            </p>
-                                            <Trash2 className="h-4 w-4 text-red-500 opacity-0 group-hover:opacity-100"
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteModel(e, m.id); }} />
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1 flex justify-between">
-                                            <span>{(m.size / 1024 / 1024).toFixed(1)} MB</span>
-                                            <span className="text-gray-600">{new Date(m.created_at).toLocaleDateString()}</span>
-                                        </p>
+                            )}
+
+                            {/* CONTROL BAR (RESTORED) */}
+                            {modelObject && (
+                                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-[#151B23]/90 border border-white/10 p-3 rounded-lg backdrop-blur-md flex items-center gap-6 shadow-xl z-10 w-[90%] max-w-2xl justify-around">
+
+                                    {/* Rotation */}
+                                    <div className="flex flex-col items-center gap-1 w-32">
+                                        <span className="text-[10px] text-gray-400 font-mono uppercase">Rotación</span>
+                                        <Slider
+                                            value={[rotation]}
+                                            min={0} max={6.28} step={0.1}
+                                            onValueChange={([v]) => setRotation(v)}
+                                            className="w-full"
+                                        />
                                     </div>
-                                ))
+
+                                    {/* Height */}
+                                    <div className="flex flex-col items-center gap-1 w-32">
+                                        <span className="text-[10px] text-gray-400 font-mono uppercase">Altura</span>
+                                        <Slider
+                                            value={[verticalPos]}
+                                            min={-5} max={5} step={0.1}
+                                            onValueChange={([v]) => setVerticalPos(v)}
+                                            className="w-full"
+                                        />
+                                    </div>
+
+                                    {/* Color Toggle */}
+                                    <div className="flex flex-col items-center gap-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-gray-400 font-mono uppercase">Pintura</span>
+                                            <Switch checked={isRxMode} onCheckedChange={setIsRxMode} />
+                                        </div>
+                                        {isRxMode && (
+                                            <input
+                                                type="color"
+                                                value={color}
+                                                onChange={(e) => setColor(e.target.value)}
+                                                className="w-8 h-6 bg-transparent cursor-pointer"
+                                            />
+                                        )}
+                                    </div>
+
+                                    {/* Reset */}
+                                    <Button variant="ghost" size="icon" onClick={resetCamera} title="Reset Camera">
+                                        <RefreshCw className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             )}
                         </div>
-                    </div>
-                )}
-            </div>
 
-            {/* Overlays - Force FIXED to cover confirmed dialogs and everything */}
-            {loading && (
-                <div className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-[9999]">
-                    <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
-                    <p className="text-xl font-bold text-white">{uploadStatus || "Cargando..."}</p>
-                    {progress > 0 && <p className="text-lg text-blue-400 mt-2">{progress}%</p>}
-                </div>
-            )}
-            {/* Inputs and Dialogs */}
-            <input
-                type="file"
-                ref={fileInput3DRef}
-                className="hidden"
-                multiple
-                accept=".glb,.gltf,.obj,.fbx,.zip"
-                onChange={handle3DFileChange}
-            />
+                        {/* Library Sidebar */}
+                        {showLibrary && (
+                            <div className="w-80 border-l border-white/10 bg-[#151B23] p-4 overflow-y-auto flex flex-col">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold">Tu Librería</h3>
+                                    <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading}>
+                                        <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </div>
 
-            <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Guardar Modelo</DialogTitle></DialogHeader>
-                    <div className="space-y-4">
-                        <input
-                            className="w-full p-2 bg-black/20 border rounded"
-                            placeholder="Nombre del modelo"
-                            value={saveData.name}
-                            onChange={e => setSaveData(prev => ({ ...prev, name: e.target.value }))}
-                        />
-                        <select
-                            className="w-full p-2 bg-black/20 border rounded"
-                            value={saveData.projectId}
-                            onChange={e => setSaveData(prev => ({ ...prev, projectId: e.target.value }))}
-                        >
-                            <option value="">-- Nuevo Proyecto --</option>
-                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
-                    <DialogFooter>
-                        <Button onClick={confirmSaveToProject}>Guardar</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                                {/* Error Message */}
+                                {libraryError && (
+                                    <div className="p-3 bg-red-500/20 border border-red-500/50 rounded mb-4 text-xs text-red-200">
+                                        ⚠️ {libraryError}
+                                    </div>
+                                )}
 
-            <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Subir Archivos</DialogTitle></DialogHeader>
-                    <div className="grid place-items-center p-8 border-2 border-dashed rounded cursor-pointer hover:bg-white/5" onClick={() => fileInput3DRef.current?.click()}>
-                        <Upload className="h-8 w-8 mb-2" />
-                        <p onClick={(e) => { e.stopPropagation(); fileInput3DRef.current?.click(); }}>Clic para seleccionar archivos (Forzar)</p>
+                                {/* Projects / Models List */}
+                                <div className="space-y-4 flex-1">
+                                    {userModels.length === 0 ? (
+                                        <div className="text-center py-8 text-gray-500">
+                                            <BoxIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                            <p className="text-sm">No tienes modelos guardados.</p>
+                                            <p className="text-xs mt-1">Sube uno para empezar.</p>
+                                        </div>
+                                    ) : (
+                                        userModels.map(m => (
+                                            <div key={m.id} className="p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer group" onClick={() => handleLoadModel(m)}>
+                                                <div className="flex justify-between">
+                                                    <p className="font-medium truncate" title={m.name || m.file_name}>
+                                                        {m.name || m.file_name}
+                                                    </p>
+                                                    <Trash2 className="h-4 w-4 text-red-500 opacity-0 group-hover:opacity-100"
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteModel(e, m.id); }} />
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1 flex justify-between">
+                                                    <span>{(m.size / 1024 / 1024).toFixed(1)} MB</span>
+                                                    <span className="text-gray-600">{new Date(m.created_at).toLocaleDateString()}</span>
+                                                </p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                </DialogContent>
-            </Dialog>
-        </div >
-    );
+
+                    {/* Overlays - Force FIXED to cover confirmed dialogs and everything */}
+                    {loading && (
+                        <div className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-[9999]">
+                            <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
+                            <p className="text-xl font-bold text-white">{uploadStatus || "Cargando..."}</p>
+                            {progress > 0 && <p className="text-lg text-blue-400 mt-2">{progress}%</p>}
+                        </div>
+                    )}
+                    {/* Inputs and Dialogs */}
+                    <input
+                        type="file"
+                        ref={fileInput3DRef}
+                        className="hidden"
+                        multiple
+                        accept=".glb,.gltf,.obj,.fbx,.zip"
+                        onChange={handle3DFileChange}
+                    />
+
+                    <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+                        <DialogContent>
+                            <DialogHeader><DialogTitle>Guardar Modelo</DialogTitle></DialogHeader>
+                            <div className="space-y-4">
+                                <input
+                                    className="w-full p-2 bg-black/20 border rounded"
+                                    placeholder="Nombre del modelo"
+                                    value={saveData.name}
+                                    onChange={e => setSaveData(prev => ({ ...prev, name: e.target.value }))}
+                                />
+                                <select
+                                    className="w-full p-2 bg-black/20 border rounded"
+                                    value={saveData.projectId}
+                                    onChange={e => setSaveData(prev => ({ ...prev, projectId: e.target.value }))}
+                                >
+                                    <option value="">-- Nuevo Proyecto --</option>
+                                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                            </div>
+                            <DialogFooter>
+                                <Button onClick={confirmSaveToProject}>Guardar</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+
+                    <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                        <DialogContent>
+                            <DialogHeader><DialogTitle>Subir Archivos</DialogTitle></DialogHeader>
+                            <div className="grid place-items-center p-8 border-2 border-dashed rounded cursor-pointer hover:bg-white/5" onClick={() => fileInput3DRef.current?.click()}>
+                                <Upload className="h-8 w-8 mb-2" />
+                                <p onClick={(e) => { e.stopPropagation(); fileInput3DRef.current?.click(); }}>Clic para seleccionar archivos (Forzar)</p>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                </div >
+                );
 }
 
-export default Converter;
+                export default Converter;
