@@ -491,10 +491,18 @@ function Converter() {
                             className="flex items-center gap-3 px-4 py-1 bg-black/30 rounded-full border border-white/10 hover:bg-white/10 cursor-pointer transition-colors"
                             onClick={() => {
                                 if (!user) {
-                                    supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin + '/dashboard' } });
+                                    // FORCE REDIRECT TO CURRENT PAGE (Avoids /dashboard logic mismatch)
+                                    supabase.auth.signInWithOAuth({
+                                        provider: 'google',
+                                        options: { redirectTo: window.location.href }
+                                    });
+                                } else {
+                                    // Debug: Log session
+                                    console.log("Current Session:", user);
+                                    alert(`Session Info:\nID: ${user.id}\nEmail: ${user.email}`);
                                 }
                             }}
-                            title={user ? "Conectado (Clic para nada)" : "Desconectado (Clic para conectar)"}
+                            title={user ? `User: ${user.id} (Click for Details)` : "OFFLINE: Click to Connect"}
                         >
                             {/* Auth LED */}
                             <div className="flex items-center gap-2">
