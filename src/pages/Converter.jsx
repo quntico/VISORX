@@ -477,6 +477,16 @@ function Converter() {
 
     return (
         <div className="min-h-screen bg-[#0B0F14] text-white flex flex-col h-screen overflow-hidden">
+
+            {/* DEBUG CONSOLE (Temporary) */}
+            <div className="absolute top-0 right-0 z-[10000] bg-black/80 border border-red-500/50 p-2 text-[10px] font-mono pointer-events-none opacity-50 hover:opacity-100 transition-opacity max-w-sm overflow-hidden text-red-200">
+                <p>Status: {loading ? "Loading..." : user ? "ONLINE" : "OFFLINE"}</p>
+                <p>Hash: {window.location.hash.substring(0, 20)}...</p>
+                <p>Search: {window.location.search}</p>
+                <p>User ID: {user?.id || 'null'}</p>
+                <p>Url: {window.location.href.split('site')[1]}</p>
+            </div>
+
             {/* Header */}
             <header className="border-b border-[#29B6F6]/20 bg-[#151B23] p-4 shrink-0">
                 <div className="flex items-center justify-between">
