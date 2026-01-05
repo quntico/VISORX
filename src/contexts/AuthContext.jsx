@@ -91,14 +91,33 @@ export function AuthProvider({ children }) {
           logAuth('No active session.');
 
           if (hasHash) {
-            logAuth('OAuth detected! WAITING for Supabase Event...');
-            // CRITICAL: DO NOT set loading(false) yet.
-            // Wait for onAuthStateChange to fire.
-            // Set a fallback timeout just in case it fails.
+            logAuth('OAuth detected! Attempting manual extraction...');
+
+            // MANUAL HASH PARSING
+            const hash = window.location.hash;
+            const params = new URLSearchParams(hash.replace('#', ''));
+            const access_token = params.get('access_token');
+            const refresh_token = params.get('refresh_token');
+
+            if (access_token && refresh_token) {
+              logAuth('Manual Token Found. Forcing Session...');
+              const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+
+              if (!error && data.session) {
+                logAuth('Manual Session Set Success!');
+                setUser(data.session.user);
+                await fetchProfile(data.session.user);
+                window.history.replaceState(null, '', window.location.pathname); // Clear hash
+                setLoading(false);
+                return; // Done
+              }
+            }
+
+            // Fallback: Wait for event if manual parsing failed (or if it was a 'code=' flow)
             setTimeout(() => {
               logAuth('Hash Wait Timeout. Forcing load finish.');
               setLoading((prev) => {
-                if (prev) return false; // Only unset if still loading
+                if (prev) return false;
                 return prev;
               });
             }, 6000);
