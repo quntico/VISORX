@@ -31,6 +31,7 @@ import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js'; // 
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { TGALoader } from 'three/examples/jsm/loaders/TGALoader.js';
 import JSZip from 'jszip'; // For ZIP support
+import { QRCodeSVG } from 'qrcode.react';
 
 function Converter() {
     const navigate = useNavigate();
@@ -39,7 +40,7 @@ function Converter() {
     const { user } = useAuth();
 
     const [activeTab, setActiveTab] = useState("3d");
-    const [showLibrary, setShowLibrary] = useState(false);
+    const [showLibrary, setShowLibrary] = useState(true); // Default OPEN
     const [disableFog, setDisableFog] = useState(false);
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -527,7 +528,7 @@ function Converter() {
             {/* DEBUG CONSOLE (Fixed Visibility) */}
             <div className="fixed top-24 right-4 z-[99999] bg-zinc-950 border-2 border-red-500 p-4 rounded-lg shadow-2xl text-xs font-mono text-white w-72 backdrop-blur-sm">
                 <h3 className="font-bold border-b border-red-500/30 pb-1 mb-2 text-red-400 flex justify-between items-center">
-                    <span>DEBUGGER v3.13</span>
+                    <span>DEBUGGER v3.14</span>
                     <span className={user ? "text-green-400" : "text-red-500"}>●</span>
                 </h3>
 
@@ -591,7 +592,7 @@ function Converter() {
                             <h1 className="text-xl font-bold flex items-center gap-2">
                                 Toolkit & Convertidor
                                 <span className="bg-blue-900/50 text-blue-200 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 font-mono">
-                                    v3.13 (AUTH-BOOT)
+                                    v3.14 (AR-BETA)
                                 </span>
                             </h1>
                         </div>
@@ -616,7 +617,7 @@ function Converter() {
                         >
                             {/* Auth LED */}
                             <div className="flex justify-between items-center mb-3 border-b border-red-900/30 pb-2">
-                                <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">DEBUGGER v3.13</span>
+                                <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">DEBUGGER v3.14</span>
                                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
                             </div>
                             <span className="text-xs font-mono text-gray-400">
@@ -809,6 +810,70 @@ function Converter() {
                     <DialogFooter>
                         <Button onClick={confirmSaveToProject}>Guardar</Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* AR DIALOG */}
+            <Dialog open={showArDialog} onOpenChange={setShowArDialog}>
+                <DialogContent className="sm:max-w-md bg-[#151B23] border border-gray-700 text-white">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <BoxIcon className="text-purple-400" /> Visualizador AR
+                        </DialogTitle>
+                        <DialogDescription className="text-gray-400">
+                            Escanea el código con tu celular o usa los botones si ya estás en móvil.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <Tabs defaultValue="ios" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 bg-black/40">
+                            <TabsTrigger value="ios">iOS (iPhone/iPad)</TabsTrigger>
+                            <TabsTrigger value="android">Android</TabsTrigger>
+                        </TabsList>
+
+                        {/* iOS TAB */}
+                        <TabsContent value="ios" className="flex flex-col items-center gap-4 py-4">
+                            <div className="bg-white p-2 rounded-lg">
+                                {/* NOTE: In production, URL.createObjectURL won't work cross-device via QR. 
+                                    Ideally we upload to cloud and share URL. 
+                                    For now, we use Blob URL (works if user is on SAME device). 
+                                    To fix cross-device, we'd need to upload first. 
+                                    Let's warn user or auto-upload? 
+                                    Actually, standard practice for local generator is just download.
+                                */}
+                                <QRCodeSVG value={arUrls.usdz || ""} size={150} />
+                            </div>
+                            <p className="text-xs text-center text-gray-400 px-4">
+                                * Nota: El QR solo funciona si ambos dispositivos comparten la sesión (Blob local).
+                                Para compartir real, usa "Subir a Librería" primero.
+                            </p>
+                            <a
+                                href={arUrls.usdz}
+                                rel="ar"
+                                download="model.usdz"
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded font-bold flex items-center justify-center gap-2"
+                            >
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/c/ca/IOS_logo_2013.svg" className="w-4 h-4 invert" alt="iOS" />
+                                Abrir en AR Quick Look
+                            </a>
+                        </TabsContent>
+
+                        {/* ANDROID TAB */}
+                        <TabsContent value="android" className="flex flex-col items-center gap-4 py-4">
+                            <div className="bg-white p-2 rounded-lg">
+                                <QRCodeSVG value={arUrls.glb || ""} size={150} />
+                            </div>
+                            <a
+                                href={`intent://view?file=${encodeURIComponent(arUrls.glb)}#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end;`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="w-full bg-green-600 hover:bg-green-700 text-white text-center py-2 rounded font-bold flex items-center justify-center gap-2"
+                            >
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/d/d7/Android_robot.svg" className="w-4 h-4" alt="Android" />
+                                Abrir en Scene Viewer
+                            </a>
+                        </TabsContent>
+                    </Tabs>
                 </DialogContent>
             </Dialog>
 

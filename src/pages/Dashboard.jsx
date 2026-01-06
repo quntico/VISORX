@@ -159,7 +159,7 @@ function Dashboard() {
                 <Cube className="h-8 w-8 text-[#29B6F6]" />
                 <div>
                   <h1 className="text-xl font-bold text-white">VISOR-X</h1>
-                  <span className="text-[10px] text-[#29B6F6] font-mono bg-[#29B6F6]/10 px-1.5 py-0.5 rounded border border-[#29B6F6]/20">v3.13 (AUTH-BOOT)</span>
+                  <span className="text-[10px] text-[#29B6F6] font-mono bg-[#29B6F6]/10 px-1.5 py-0.5 rounded border border-[#29B6F6]/20">v3.14 (AR-BETA)</span>
                 </div>
               </div>
               <div className="flex items-center gap-4">
