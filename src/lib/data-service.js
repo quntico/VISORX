@@ -194,49 +194,83 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser }) 
 }
 
 export async function saveModelFlow({ file, selectedProjectId, onStep, authUser }) {
-  console.log("STEP 1: saveModelFlow started");
-  onStep?.({ step: 1, total: 3, message: 'Verificando sesión y proyecto...' });
+  const start = Date.now();
+  console.log("start-flow: saveModelFlow started");
+
+  // 1. DIAGNOSTICS & AUTH CHECK
+  const sbUrl = import.meta.env.VITE_SUPABASE_URL || 'MISSING';
+  const sbKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'MISSING';
+  console.log(`[EnvCheck] URL: ${sbUrl}, Key (start): ${sbKey.substring(0, 10)}...`);
+
+  onStep?.({ step: 1, total: 3, message: 'Verificando sesión...' });
+
+  // 2. STRICT SESSION REFRESH
+  let sessionUser = authUser;
+  if (!sessionUser) {
+    console.log("STEP 1: Getting Clean Session...");
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error || !session) {
+      console.warn("STEP 1: Session invalid/missing, trying refresh...");
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshData.session) {
+        throw new Error("Init Error: Auth Timeout or Invalid Session. Please Re-login.");
+      }
+      sessionUser = refreshData.session.user;
+    } else {
+      sessionUser = session.user;
+    }
+  }
+
+  console.log(`STEP 1: User Confirmed: ${sessionUser.id} (${Date.now() - start}ms)`);
 
   let projectId = selectedProjectId;
 
-  // Ensure user exists
-  console.log("STEP 1b: checking user...");
-  const user = await requireUser(authUser);
-  console.log("STEP 1c: user confirmed", user.id);
-
-  // STRATEGY: Default Project / Reuse
+  // 3. PROJECT RESOLUTION (Existing vs RPC)
   if (!projectId) {
+    onStep?.({ step: 1, total: 3, message: 'Buscando proyecto...' });
+
     try {
-      console.log("STEP 2: Searching for existing project...");
-      const existingProjects = await listProjects(user);
+      console.log("STEP 2: Searching for existing project (8s max)...");
+
+      // Wrap query in explicit timeout
+      const searchPromise = supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', sessionUser.id)
+        .order('created_at', { ascending: false })
+        .limit(1); // Efficient
+
+      const { data: existingProjects, error } = await withTimeout(searchPromise, 8000, 'search.projects');
+
+      if (error) throw error;
 
       if (existingProjects && existingProjects.length > 0) {
         projectId = existingProjects[0].id;
-        console.log("STEP 2: Found existing project. Reusing:", projectId);
+        console.log(`STEP 2: Found existing project (Reusing): ${projectId} (${Date.now() - start}ms)`);
       } else {
         console.log("STEP 2: No existing projects found. Creating new via RPC...");
-        const project = await createProject({ name: 'Nuevo Proyecto', description: 'Proyecto creado automáticamente' }, user);
-        projectId = project.id;
+        throw new Error("No projects found (Trigger RPC)");
       }
     } catch (err) {
-      console.error("STEP 2 Error: Default Project Strategy Failed.", err);
-      throw err;
+      // FALLBACK TO RPC
+      console.warn(`STEP 2 Warning: Search failed/timeout/empty (${err.message}). Falling back to RPC.`);
+      const project = await createProject({ name: 'Nuevo Proyecto', description: 'Proyecto creado automáticamente' }, sessionUser);
+      projectId = project.id;
     }
   } else {
     console.log("STEP 2: Using provided project:", projectId);
   }
 
+  // 4. UPLOAD
   try {
     console.log(`STEP 3: Calling uploadModelToCloud with ID: ${projectId}...`);
-    const result = await uploadModelToCloud({ file, projectId, onStep, authUser });
-    console.log("STEP 8: Workflow Complete!", result);
+    const result = await uploadModelToCloud({ file, projectId, onStep, authUser: sessionUser });
+    console.log(`STEP 8: Workflow Complete! Total time: ${Date.now() - start}ms`, result);
     return { projectId, ...result };
   } catch (e) {
     console.error("Workflow Failed:", e);
-    // Only mark project error if it's a real project
-    if (projectId) {
-      await markProjectError(projectId, e?.message || e);
-    }
+    if (projectId) await markProjectError(projectId, e?.message || e);
     throw e;
   }
 }
