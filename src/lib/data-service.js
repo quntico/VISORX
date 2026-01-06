@@ -193,6 +193,24 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser }) 
   return record;
 }
 
+// SELF-HEALING AUTH: Force cleanup on stale sessions
+async function recoverSession() {
+  console.warn("🚨 SELF-HEALING: Session corrupted. Clearing storage & reloading...");
+
+  // 1. Local Logout
+  await supabase.auth.signOut().catch(() => { });
+
+  // 2. Aggressive Storage Cleansing
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('sb-') || key.includes('supabase') || key.includes('auth_token')) {
+      localStorage.removeItem(key);
+    }
+  });
+
+  // 3. Force Reload
+  window.location.reload();
+}
+
 export async function saveModelFlow({ file, selectedProjectId, onStep, authUser }) {
   const start = Date.now();
   console.log("start-flow: saveModelFlow started");
@@ -206,20 +224,31 @@ export async function saveModelFlow({ file, selectedProjectId, onStep, authUser 
 
   // 2. STRICT SESSION REFRESH
   let sessionUser = authUser;
-  if (!sessionUser) {
-    console.log("STEP 1: Getting Clean Session...");
-    const { data: { session }, error } = await supabase.auth.getSession();
+  try {
+    if (!sessionUser) {
+      console.log("STEP 1: Getting Clean Session...");
+      // Race condition wrapper for getSession (5s max)
+      const sessionPromise = supabase.auth.getSession();
+      const { data, error } = await withTimeout(sessionPromise, 5000, 'auth.getSession');
 
-    if (error || !session) {
-      console.warn("STEP 1: Session invalid/missing, trying refresh...");
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError || !refreshData.session) {
-        throw new Error("Init Error: Auth Timeout or Invalid Session. Please Re-login.");
+      if (error || !data.session) {
+        console.warn("STEP 1: Session invalid/timeout. Trying refresh...");
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshData.session) {
+          throw new Error("AUTH_DEAD");
+        }
+        sessionUser = refreshData.session.user;
+      } else {
+        sessionUser = data.session.user;
       }
-      sessionUser = refreshData.session.user;
-    } else {
-      sessionUser = session.user;
     }
+  } catch (e) {
+    console.error("STEP 1 FATAL: Auth System Dead.", e);
+    if (e.message.includes("AUTH_DEAD") || e.message.includes("Timeout")) {
+      await recoverSession();
+      throw new Error("Sesión caducada. Recargando...");
+    }
+    throw e;
   }
 
   console.log(`STEP 1: User Confirmed: ${sessionUser.id} (${Date.now() - start}ms)`);
@@ -239,7 +268,7 @@ export async function saveModelFlow({ file, selectedProjectId, onStep, authUser 
         .select('*')
         .eq('user_id', sessionUser.id)
         .order('created_at', { ascending: false })
-        .limit(1); // Efficient
+        .limit(1);
 
       const { data: existingProjects, error } = await withTimeout(searchPromise, 8000, 'search.projects');
 
@@ -253,10 +282,24 @@ export async function saveModelFlow({ file, selectedProjectId, onStep, authUser 
         throw new Error("No projects found (Trigger RPC)");
       }
     } catch (err) {
+      if (err.message.includes("Timeout")) {
+        console.error("STEP 2 TIMEOUT: Database Unreachable?");
+        // Only auto-recover if it's strictly a timeout on READ, hinting at stale auth headers
+        if (Date.now() - start > 8000) {
+          await recoverSession();
+          throw new Error("Conexión inestable. Reiniciando...");
+        }
+      }
+
       // FALLBACK TO RPC
       console.warn(`STEP 2 Warning: Search failed/timeout/empty (${err.message}). Falling back to RPC.`);
-      const project = await createProject({ name: 'Nuevo Proyecto', description: 'Proyecto creado automáticamente' }, sessionUser);
-      projectId = project.id;
+      try {
+        const project = await createProject({ name: 'Nuevo Proyecto', description: 'Proyecto creado automáticamente' }, sessionUser);
+        projectId = project.id;
+      } catch (rpcErr) {
+        console.error("STEP 2 FATAL: RPC also failed.", rpcErr);
+        throw new Error("Error crítico de base de datos. Intente más tarde.");
+      }
     }
   } else {
     console.log("STEP 2: Using provided project:", projectId);
