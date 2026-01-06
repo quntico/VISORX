@@ -80,68 +80,65 @@ function Converter() {
     const [showDebugDialog, setShowDebugDialog] = useState(false);
 
     // Initial Load
-    // Unified Library Fetcher
-    const refetchLibrary = async (isManual = false) => {
-        if (!user) return;
-
-        console.log("LIB: refetch start");
-        if (isManual) setRefreshingLibrary(true);
-        setLibraryError(null);
-
+    // 2) refetch único (User Request Pattern)
+    const refetchLibrary = useCallback(async () => {
         try {
-            const projs = await listProjects(user);
-            setProjects(projs);
+            setRefreshingLibrary(true);
+            setLibraryError(null);
 
-            const { data: models, error } = await supabase
-                .from('models')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
+            // Strict Session Check
+            const { data: { session }, error: sessErr } = await supabase.auth.getSession();
+            if (sessErr) throw sessErr;
+            const currentUser = session?.user;
+
+            if (!currentUser?.id) {
+                console.warn("LIB: No session/user id found during refetch");
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from("models")
+                .select("id,name,created_at,file_path,project_id,user_id")
+                .eq("user_id", currentUser.id)
+                .order("created_at", { ascending: false });
 
             if (error) throw error;
 
-            console.log(`LIB: refetch ok count=${models?.length || 0}`);
-            setUserModels(models || []);
-
-            if (isManual) {
-                toast({
-                    title: "Librería Actualizada",
-                    description: `Se encontraron ${models?.length || 0} modelos.`,
-                    duration: 2000
-                });
-            }
+            setUserModels(data ?? []);
+            console.log("LIB: refetch ok count=", (data ?? []).length);
         } catch (e) {
             console.error("LIB: refetch error", e);
-            setLibraryError(e.message);
-            toast({ title: "Error", description: "Fallo al actualizar librería.", variant: "destructive" });
+            setLibraryError(e?.message ?? String(e));
         } finally {
-            if (isManual) setRefreshingLibrary(false);
+            setRefreshingLibrary(false);
         }
-    };
+    }, []);
 
-    // Initial Load & Event Listeners
+    // 3) refrescar por focus/visibility
     useEffect(() => {
-        if (user) {
+        const onFocus = () => {
+            console.log("Focus detected, refreshing...");
             refetchLibrary();
-
-            const handleFocus = () => {
-                console.log("LIB: Window focused, refreshing...");
+        };
+        const onVis = () => {
+            if (document.visibilityState === "visible") {
+                console.log("Visibility visible, refreshing...");
                 refetchLibrary();
-            };
+            }
+        };
 
-            window.addEventListener('focus', handleFocus);
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') handleFocus();
-            });
+        window.addEventListener("focus", onFocus);
+        document.addEventListener("visibilitychange", onVis);
+        return () => {
+            window.removeEventListener("focus", onFocus);
+            document.removeEventListener("visibilitychange", onVis);
+        };
+    }, [refetchLibrary]);
 
-            return () => {
-                window.removeEventListener('focus', handleFocus);
-                // Note: visibilitychange listener cleanup is tricky with anonymous func, 
-                // but component unmount handles the main concern. 
-                // For strictness we could define the handler outside.
-            };
-        }
-    }, [user]);
+    // 4) llamar al inicio
+    useEffect(() => {
+        if (user) refetchLibrary();
+    }, [refetchLibrary, user]);
 
     // ==================== SAVE LOGIC (NEW) ====================
     const confirmSaveToProject = async () => {
@@ -273,7 +270,7 @@ function Converter() {
             });
 
             toast({ title: "Subida Completa", description: "Archivo guardado correctamente." });
-            await loadAllData();
+            await refetchLibrary();
             setLargeFileToUpload(null);
 
         } catch (error) {
