@@ -661,7 +661,7 @@ function Converter() {
                                 <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                 <span className="sm:hidden">Toolkit</span>
                                 <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                    v3.17.12
+                                    v3.17.13
                                 </span>
                             </h1>
                         </div>
@@ -839,7 +839,7 @@ function Converter() {
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold">Tu Librería</h3>
                             <div className="flex gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => refetchLibrary(true)} disabled={loading || refreshingLibrary}>
+                                <Button variant="ghost" size="sm" onClick={() => refetchLibrary()} disabled={loading || refreshingLibrary}>
                                     <RotateCw className={`h-4 w-4 ${refreshingLibrary ? 'animate-spin text-[#29B6F6]' : ''}`} />
                                 </Button>
                                 {/* Mobile Close Button */}
