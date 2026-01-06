@@ -1,0 +1,29 @@
+[36mvite v4.5.5 [32mbuilding for production...[36m[39m
+transforming...
+[32mÔ£ô[39m 24 modules transformed.
+[32mÔ£ô built in 1.06s[39m
+[vite:esbuild] Transform failed with 1 error:
+C:/Users/fredd/OneDrive/Desktop/VISORX2026/src/pages/Converter.jsx:879:0: ERROR: Unexpected end of file before a closing "div" tag
+file: C:/Users/fredd/OneDrive/Desktop/VISORX2026/src/pages/Converter.jsx:879:0
+
+Unexpected end of file before a closing "div" tag
+876|  }
+877|  
+878|              export default Converter;
+   |                                        ^
+879|  
+   |  ^
+
+error during build:
+Error: Transform failed with 1 error:
+C:/Users/fredd/OneDrive/Desktop/VISORX2026/src/pages/Converter.jsx:879:0: ERROR: Unexpected end of file before a closing "div" tag
+    at failureErrorWithLog (C:\Users\fredd\OneDrive\Desktop\VISORX2026\node_modules\esbuild\lib\main.js:1649:15)
+    at C:\Users\fredd\OneDrive\Desktop\VISORX2026\node_modules\esbuild\lib\main.js:847:29
+    at responseCallbacks.<computed> (C:\Users\fredd\OneDrive\Desktop\VISORX2026\node_modules\esbuild\lib\main.js:703:9)
+    at handleIncomingPacket (C:\Users\fredd\OneDrive\Desktop\VISORX2026\node_modules\esbuild\lib\main.js:762:9)
+    at Socket.readFromStdout (C:\Users\fredd\OneDrive\Desktop\VISORX2026\node_modules\esbuild\lib\main.js:679:7)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)

@@ -748,12 +748,16 @@ function Converter() {
                             ) : (
                                 userModels.map(m => (
                                     <div key={m.id} className="p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer group" onClick={() => { handleLoadModel(m); if (window.innerWidth < 640) setShowLibrary(false); }}>
-                                        <div className="flex justify-between">
-                                            <p className="font-medium truncate max-w-[150px]" title={m.name || m.file_name}>
+                                        <div className="flex justify-between items-center">
+                                            <p className="font-medium truncate max-w-[150px] text-sm" title={m.name || m.file_name}>
                                                 {m.name || m.file_name}
                                             </p>
-                                            <Trash2 className="h-4 w-4 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteModel(e, m.id); }} />
+                                            <div
+                                                className="p-1 hover:bg-white/20 rounded cursor-pointer"
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteModel(e, m.id); }}
+                                            >
+                                                <Trash2 className="h-4 w-4 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
                                         </div>
                                     </div>
                                 ))
@@ -871,8 +875,9 @@ function Converter() {
                         </div>
                     </DialogContent>
                 </Dialog>
-            </div >
-            );
+            </div>
+        </div>
+    );
 }
 
-            export default Converter;
+export default Converter;
