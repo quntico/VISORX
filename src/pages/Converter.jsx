@@ -538,7 +538,7 @@ function Converter() {
                             <h1 className="text-xl font-bold flex items-center gap-2">
                                 Toolkit & Convertidor
                                 <span className="bg-blue-900/50 text-blue-200 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 font-mono">
-                                    v3.2.0 (PKCE)
+                                    v3.6 (HASHFIX)
                                 </span>
                             </h1>
                         </div>
