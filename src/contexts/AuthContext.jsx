@@ -103,17 +103,31 @@ export function AuthProvider({ children }) {
             const refresh_token = params.get('refresh_token');
             const code = searchParams.get('code');
 
-            if (access_token && refresh_token) {
-              logAuth('Manual Token (Implicit) Found. Forcing Session...');
-              const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+            if (access_token) {
+              logAuth('Manual Token Found. Forcing Session...');
+              const { data, error } = await supabase.auth.setSession({
+                access_token,
+                refresh_token: refresh_token || '' // Allow missing refresh token
+              });
 
-              if (!error && data.session) {
+              if (!error && (data.session || data.user)) {
                 logAuth('Manual Session Set Success!');
-                setUser(data.session.user);
-                await fetchProfile(data.session.user);
+                setUser(data.user || data.session.user);
+                await fetchProfile(data.user || data.session.user);
                 window.history.replaceState(null, '', window.location.pathname); // Clear hash
                 setLoading(false);
                 return; // Done
+              } else {
+                console.error("Manual SetSession Failed:", error);
+                // Fallback: Try getUser directly with token
+                const { data: userData, error: userError } = await supabase.auth.getUser(access_token);
+                if (userData?.user) {
+                  logAuth('Recovered User via Token!');
+                  setUser(userData.user);
+                  await fetchProfile(userData.user);
+                  setLoading(false);
+                  return;
+                }
               }
             } else if (code) {
               logAuth('Manual Code (PKCE) Found. Exchanging...');
