@@ -73,6 +73,7 @@ function Converter() {
     const [helpContent, setHelpContent] = useState(null);
 
     const [libraryError, setLibraryError] = useState(null);
+    const [showDebugDialog, setShowDebugDialog] = useState(false);
 
     // Initial Load
     useEffect(() => {
@@ -569,202 +570,232 @@ function Converter() {
     return (
         <div className="min-h-screen bg-[#0B0F14] text-white flex flex-col h-screen overflow-hidden">
 
-            const [showDebugDialog, setShowDebugDialog] = useState(false);
-            return (
-            <div className="min-h-screen bg-[#0B0F14] text-white flex flex-col h-screen overflow-hidden">
-
-                {/* Header */}
-                <header className="border-b border-[#29B6F6]/20 bg-[#151B23] p-4 shrink-0 z-20 relative">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-                                <ArrowLeft className="h-5 w-5" />
-                            </Button>
-                            <div className="flex flex-col">
-                                <h1 className="text-xl font-bold flex items-center gap-2">
-                                    <span className="hidden sm:inline">Toolkit & Convertidor</span>
-                                    <span className="sm:hidden">Toolkit</span>
-                                    <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                        v3.16.0
-                                    </span>
-                                </h1>
-                            </div>
-
-                            {/* INDICATORS (Mobile Optimized) */}
-                            <div
-                                className="flex items-center gap-2 px-3 py-1 bg-black/30 rounded-full border border-white/10 hover:bg-white/10 cursor-pointer transition-colors"
-                                onClick={() => setShowDebugDialog(true)}
-                            >
-                                <div className={`w-2 h-2 rounded-full ${user ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-red-500 animate-pulse"}`}></div>
-                                <span className="text-xs font-mono text-gray-300 hidden sm:inline">
-                                    {user ? "ONLINE" : "OFFLINE"}
+            {/* Header */}
+            <header className="border-b border-[#29B6F6]/20 bg-[#151B23] p-4 shrink-0 z-20 relative">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                        <div className="flex flex-col">
+                            <h1 className="text-xl font-bold flex items-center gap-2">
+                                <span className="hidden sm:inline">Toolkit & Convertidor</span>
+                                <span className="sm:hidden">Toolkit</span>
+                                <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
+                                    v3.16.0
                                 </span>
-                            </div>
+                            </h1>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant={showLibrary ? "default" : "ghost"}
-                                size="sm"
-                                onClick={() => setShowLibrary(!showLibrary)}
-                                className={showLibrary ? "bg-[#29B6F6] text-black hover:bg-[#29B6F6]/90" : ""}
-                            >
-                                <BookOpen className="h-4 w-4 sm:mr-2" />
-                                <span className="hidden sm:inline">Librería</span>
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => setShowDebugDialog(true)}>
-                                <AlertCircle className="h-5 w-5 text-gray-400" />
-                            </Button>
-                        </div>
-                    </div>
-
-                    {/* Secondary Toolbar - Scrollable on mobile */}
-                    <div className="flex gap-2 mt-2 overflow-x-auto pb-1 no-scrollbar sm:justify-end">
-                        <Button variant="outline" size="sm" onClick={() => setShowUploadDialog(true)} className="whitespace-nowrap">
-                            <Upload className="h-4 w-4 mr-2" /> Subir
-                        </Button>
-                        <Button
-                            size="sm"
-                            className="bg-purple-600 hover:bg-purple-700 text-white border border-purple-400/30 whitespace-nowrap"
-                            onClick={handleOpenAR}
-                            disabled={!modelObject}
+                        {/* INDICATORS (Mobile Optimized) */}
+                        <div
+                            className="flex items-center gap-2 px-3 py-1 bg-black/30 rounded-full border border-white/10 hover:bg-white/10 cursor-pointer transition-colors"
+                            onClick={() => setShowDebugDialog(true)}
                         >
-                            <BoxIcon className="h-4 w-4 mr-2" /> AR / Proyectar
-                        </Button>
-                        <Button size="sm" onClick={() => setShowSaveDialog(true)} disabled={!modelObject} className="whitespace-nowrap">
-                            <Save className="h-4 w-4 mr-2" /> Guardar
-                        </Button>
+                            <div className={`w-2 h-2 rounded-full ${user ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-red-500 animate-pulse"}`}></div>
+                            <span className="text-xs font-mono text-gray-300 hidden sm:inline">
+                                {user ? "ONLINE" : "OFFLINE"}
+                            </span>
+                        </div>
                     </div>
 
-                </header >
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant={showLibrary ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => setShowLibrary(!showLibrary)}
+                            className={showLibrary ? "bg-[#29B6F6] text-black hover:bg-[#29B6F6]/90" : ""}
+                        >
+                            <BookOpen className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Librería</span>
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setShowDebugDialog(true)}>
+                            <AlertCircle className="h-5 w-5 text-gray-400" />
+                        </Button>
+                    </div>
+                </div>
 
-                <div className="flex-1 flex overflow-hidden">
-
-                    {/* 3D View */}
-                    <div
-                        className="flex-1 relative bg-black/50"
-                        style={{ touchAction: 'none' }} // PREVENTS SCROLL ON MOBILE DRAG
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                            e.preventDefault();
-                            const files = Array.from(e.dataTransfer.files);
-                            if (files.length > 0) processFiles(files);
-                        }}
+                {/* Secondary Toolbar - Scrollable on mobile */}
+                <div className="flex gap-2 mt-2 overflow-x-auto pb-1 no-scrollbar sm:justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setShowUploadDialog(true)} className="whitespace-nowrap">
+                        <Upload className="h-4 w-4 mr-2" /> Subir
+                    </Button>
+                    <Button
+                        size="sm"
+                        className="bg-purple-600 hover:bg-purple-700 text-white border border-purple-400/30 whitespace-nowrap"
+                        onClick={handleOpenAR}
+                        disabled={!modelObject}
                     >
-                        {/* Three.js Container */}
-                        <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
+                        <BoxIcon className="h-4 w-4 mr-2" /> AR / Proyectar
+                    </Button>
+                    <Button size="sm" onClick={() => setShowSaveDialog(true)} disabled={!modelObject} className="whitespace-nowrap">
+                        <Save className="h-4 w-4 mr-2" /> Guardar
+                    </Button>
+                </div>
 
-                        {/* React Overlay - Empty State */}
-                        {!modelObject && (
-                            <div className="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none p-4 text-center">
-                                <p>Arrastra un archivo aquí o usa "Subir ZIP"</p>
+            </header >
+
+            <div className="flex-1 flex overflow-hidden">
+
+                {/* 3D View */}
+                <div
+                    className="flex-1 relative bg-black/50"
+                    style={{ touchAction: 'none' }} // PREVENTS SCROLL ON MOBILE DRAG
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        const files = Array.from(e.dataTransfer.files);
+                        if (files.length > 0) processFiles(files);
+                    }}
+                >
+                    {/* Three.js Container */}
+                    <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
+
+                    {/* React Overlay - Empty State */}
+                    {!modelObject && (
+                        <div className="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none p-4 text-center">
+                            <p>Arrastra un archivo aquí o usa "Subir ZIP"</p>
+                        </div>
+                    )}
+
+                    {/* CONTROL BAR (MOBILE OPTIMIZED) */}
+                    {modelObject && (
+                        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-[#151B23]/90 border border-white/10 p-3 rounded-lg backdrop-blur-md flex items-center gap-4 shadow-xl z-10 w-[95%] max-w-2xl justify-around overflow-x-auto no-scrollbar">
+
+                            {/* Rotation */}
+                            <div className="flex flex-col items-center gap-1 min-w-[80px] w-full max-w-[120px]">
+                                <span className="text-[9px] text-gray-400 font-mono uppercase">Rotación</span>
+                                <Slider
+                                    value={[rotation]}
+                                    min={0} max={6.28} step={0.1}
+                                    onValueChange={([v]) => setRotation(v)}
+                                    className="w-full"
+                                />
                             </div>
-                        )}
 
-                        {/* CONTROL BAR (MOBILE OPTIMIZED) */}
-                        {modelObject && (
-                            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-[#151B23]/90 border border-white/10 p-3 rounded-lg backdrop-blur-md flex items-center gap-4 shadow-xl z-10 w-[95%] max-w-2xl justify-around overflow-x-auto no-scrollbar">
+                            {/* Height */}
+                            <div className="flex flex-col items-center gap-1 min-w-[80px] w-full max-w-[120px]">
+                                <span className="text-[9px] text-gray-400 font-mono uppercase">Altura</span>
+                                <Slider
+                                    value={[verticalPos]}
+                                    min={-5} max={5} step={0.1}
+                                    onValueChange={([v]) => setVerticalPos(v)}
+                                    className="w-full"
+                                />
+                            </div>
 
-                                {/* Rotation */}
-                                <div className="flex flex-col items-center gap-1 min-w-[80px] w-full max-w-[120px]">
-                                    <span className="text-[9px] text-gray-400 font-mono uppercase">Rotación</span>
-                                    <Slider
-                                        value={[rotation]}
-                                        min={0} max={6.28} step={0.1}
-                                        onValueChange={([v]) => setRotation(v)}
-                                        className="w-full"
+                            {/* Version Display */}
+                            <div className="bg-[#151B23] px-3 py-1.5 rounded border border-[#1E293B]">
+                                <span className="text-[#29B6F6] text-xs font-bold">v3.16.0</span>
+                                <span className="text-gray-500 text-[10px] ml-2 font-mono">(MOBILE-REV)</span>
+                            </div>
+
+                            {/* Color Toggle */}
+                            <div className="flex flex-col items-center gap-1 shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[9px] text-gray-400 font-mono uppercase">Pintura</span>
+                                    <Switch checked={isRxMode} onCheckedChange={setIsRxMode} />
+                                </div>
+                                {isRxMode && (
+                                    <input
+                                        type="color"
+                                        value={color}
+                                        onChange={(e) => setColor(e.target.value)}
+                                        className="w-8 h-6 bg-transparent cursor-pointer"
                                     />
-                                </div>
+                                )}
+                            </div>
 
-                                {/* Height */}
-                                <div className="flex flex-col items-center gap-1 min-w-[80px] w-full max-w-[120px]">
-                                    <span className="text-[9px] text-gray-400 font-mono uppercase">Altura</span>
-                                    <Slider
-                                        value={[verticalPos]}
-                                        min={-5} max={5} step={0.1}
-                                        onValueChange={([v]) => setVerticalPos(v)}
-                                        className="w-full"
-                                    />
-                                </div>
+                            {/* Reset */}
+                            <Button variant="ghost" size="icon" onClick={resetCamera} title="Reset Camera" className="shrink-0">
+                                <RefreshCw className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    )}
+                </div>
 
-                                {/* Version Display */}
-                                <div className="bg-[#151B23] px-3 py-1.5 rounded border border-[#1E293B]">
-                                    <span className="text-[#29B6F6] text-xs font-bold">v3.16.0</span>
-                                    <span className="text-gray-500 text-[10px] ml-2 font-mono">(MOBILE-REV)</span>
-                                </div>
-
-                                {/* Color Toggle */}
-                                <div className="flex flex-col items-center gap-1 shrink-0">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[9px] text-gray-400 font-mono uppercase">Pintura</span>
-                                        <Switch checked={isRxMode} onCheckedChange={setIsRxMode} />
-                                    </div>
-                                    {isRxMode && (
-                                        <input
-                                            type="color"
-                                            value={color}
-                                            onChange={(e) => setColor(e.target.value)}
-                                            className="w-8 h-6 bg-transparent cursor-pointer"
-                                        />
-                                    )}
-                                </div>
-
-                                {/* Reset */}
-                                <Button variant="ghost" size="icon" onClick={resetCamera} title="Reset Camera" className="shrink-0">
-                                    <RefreshCw className="h-4 w-4" />
+                {/* Library Sidebar (Responsive) */}
+                {showLibrary && (
+                    <div className="w-80 border-l border-white/10 bg-[#151B23] p-4 overflow-y-auto flex flex-col absolute inset-y-0 right-0 z-20 sm:static sm:z-0 shadow-2xl sm:shadow-none transition-all">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold">Tu Librería</h3>
+                            <div className="flex gap-2">
+                                <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading}>
+                                    <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                                </Button>
+                                {/* Mobile Close Button */}
+                                <Button variant="ghost" size="sm" className="sm:hidden" onClick={() => setShowLibrary(false)}>
+                                    <ArrowLeft className="h-4 w-4" />
                                 </Button>
                             </div>
-                        )}
-                    </div>
-
-                    {/* Library Sidebar (Responsive) */}
-                    {showLibrary && (
-                        <div className="w-80 border-l border-white/10 bg-[#151B23] p-4 overflow-y-auto flex flex-col absolute inset-y-0 right-0 z-20 sm:static sm:z-0 shadow-2xl sm:shadow-none transition-all">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-bold">Tu Librería</h3>
-                                <div className="flex gap-2">
-                                    <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading}>
-                                        <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                                    </Button>
-                                    {/* Mobile Close Button */}
-                                    <Button variant="ghost" size="sm" className="sm:hidden" onClick={() => setShowLibrary(false)}>
-                                        <ArrowLeft className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Error Message */}
-                            {libraryError && (
-                                <div className="p-3 bg-red-500/20 border border-red-500/50 rounded mb-4 text-xs text-red-200">
-                                    ⚠️ {libraryError}
-                                </div>
-                            )}
-
-                            {/* Projects / Models List */}
-                            <div className="space-y-4 flex-1">
-                                {userModels.length === 0 ? (
-                                    <div className="text-center py-8 text-gray-500">
-                                        <BoxIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                        <p className="text-sm">No tienes modelos guardados.</p>
-                                        <p className="text-xs mt-1">Sube uno para empezar.</p>
-                                    </div>
-                                ) : (
-                                    userModels.map(m => (
-                                        <div key={m.id} className="p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer group" onClick={() => { handleLoadModel(m); if (window.innerWidth < 640) setShowLibrary(false); }}>
-                                            <div className="flex justify-between">
-                                                <p className="font-medium truncate max-w-[150px]" title={m.name || m.file_name}>
-                                                    {m.name || m.file_name}
-                                                </p>
-                                                <Trash2 className="h-4 w-4 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    onClick={(e) => { e.stopPropagation(); handleDeleteModel(e, m.id); }} />
-                                            </div>
-                                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                        </select>
                         </div>
-                            <DialogFooter>
-                                <Button onClick={confirmSaveToProject}>Guardar</Button>
-                            </DialogFooter>
-                        </DialogContent>
+
+                        {/* Error Message */}
+                        {libraryError && (
+                            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded mb-4 text-xs text-red-200">
+                                ⚠️ {libraryError}
+                            </div>
+                        )}
+
+                        {/* Projects / Models List */}
+                        <div className="space-y-4 flex-1">
+                            {userModels.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <BoxIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                    <p className="text-sm">No tienes modelos guardados.</p>
+                                    <p className="text-xs mt-1">Sube uno para empezar.</p>
+                                </div>
+                            ) : (
+                                userModels.map(m => (
+                                    <div key={m.id} className="p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer group" onClick={() => { handleLoadModel(m); if (window.innerWidth < 640) setShowLibrary(false); }}>
+                                        <div className="flex justify-between">
+                                            <p className="font-medium truncate max-w-[150px]" title={m.name || m.file_name}>
+                                                {m.name || m.file_name}
+                                            </p>
+                                            <Trash2 className="h-4 w-4 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteModel(e, m.id); }} />
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Save Dialog */}
+                <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+                    <DialogContent className="bg-[#151B23] border border-gray-700 text-white">
+                        <DialogHeader>
+                            <DialogTitle>Guardar en Proyecto</DialogTitle>
+                            <DialogDescription className="text-gray-400">Selecciona un proyecto existente o crea uno nuevo.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <label htmlFor="name" className="text-right text-gray-300">Nombre</label>
+                                <input
+                                    id="name"
+                                    value={saveData.name}
+                                    onChange={(e) => setSaveData({ ...saveData, name: e.target.value })}
+                                    className="col-span-3 p-2 bg-black/20 border border-white/10 rounded text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <label htmlFor="project" className="text-right text-gray-300">Proyecto</label>
+                                <select
+                                    id="project"
+                                    value={saveData.projectId}
+                                    onChange={(e) => setSaveData({ ...saveData, projectId: e.target.value })}
+                                    className="col-span-3 p-2 bg-black/20 border border-white/10 rounded text-white"
+                                >
+                                    <option value="">Seleccionar Proyecto...</option>
+                                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button onClick={confirmSaveToProject} disabled={!saveData.name || !saveData.projectId}>Guardar</Button>
+                        </DialogFooter>
+                    </DialogContent>
                 </Dialog>
 
                 {/* AR DIALOG */}
