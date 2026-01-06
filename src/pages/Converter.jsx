@@ -257,6 +257,45 @@ function Converter() {
         }
     };
 
+    // ==================== AR LOGIC ====================
+    const [showArDialog, setShowArDialog] = useState(false);
+    const [arUrls, setArUrls] = useState({ usdz: null, glb: null });
+
+    const generateUSDZ = async () => {
+        return new Promise((resolve, reject) => {
+            if (!modelObject) return reject("No model");
+            const exporter = new USDZExporter();
+            exporter.parse(modelObject, (usdz) => {
+                const blob = new Blob([usdz], { type: 'application/octet-stream' });
+                resolve(blob);
+            }, { quickLookCompatible: true });
+        });
+    };
+
+    const handleOpenAR = async () => {
+        if (!modelObject) return;
+        setLoading(true);
+        setUploadStatus("Generando AR (iOS/Android)...");
+        try {
+            // 1. Generate GLB (Android)
+            const glbBlob = await generateGLB();
+            const glbUrl = URL.createObjectURL(glbBlob);
+
+            // 2. Generate USDZ (iOS)
+            const usdzBlob = await generateUSDZ();
+            const usdzUrl = URL.createObjectURL(usdzBlob);
+
+            setArUrls({ glb: glbUrl, usdz: usdzUrl });
+            setShowArDialog(true);
+        } catch (e) {
+            console.error(e);
+            toast({ title: "Error AR", description: "No se pudo generar los archivos AR.", variant: "destructive" });
+        } finally {
+            setLoading(false);
+            setUploadStatus("");
+        }
+    };
+
     const handle3DFileChange = (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
@@ -528,12 +567,12 @@ function Converter() {
             {/* DEBUG CONSOLE (Fixed Visibility) */}
             <div className="fixed top-24 right-4 z-[99999] bg-zinc-950 border-2 border-red-500 p-4 rounded-lg shadow-2xl text-xs font-mono text-white w-72 backdrop-blur-sm">
                 <h3 className="font-bold border-b border-red-500/30 pb-1 mb-2 text-red-400 flex justify-between items-center">
-                    <span>DEBUGGER v3.14</span>
+                    <span>DEBUGGER v3.14.1</span>
                     <span className={user ? "text-green-400" : "text-red-500"}>●</span>
                 </h3>
 
                 <div className="bg-[#151B23] px-3 py-1.5 rounded border border-[#1E293B]">
-                    <span className="text-[#29B6F6] text-xs font-bold">v3.13</span>
+                    <span className="text-[#29B6F6] text-xs font-bold">v3.14.1</span>
                     <span className="text-gray-500 text-[10px] ml-2 font-mono">(SECURE-AUTH)</span>
                 </div>
                 <div className="space-y-2 mb-4">
@@ -592,7 +631,7 @@ function Converter() {
                             <h1 className="text-xl font-bold flex items-center gap-2">
                                 Toolkit & Convertidor
                                 <span className="bg-blue-900/50 text-blue-200 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 font-mono">
-                                    v3.14 (AR-BETA)
+                                    v3.14.1 (AR-FIX)
                                 </span>
                             </h1>
                         </div>
@@ -617,7 +656,7 @@ function Converter() {
                         >
                             {/* Auth LED */}
                             <div className="flex justify-between items-center mb-3 border-b border-red-900/30 pb-2">
-                                <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">DEBUGGER v3.14</span>
+                                <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">DEBUGGER v3.14.1</span>
                                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
                             </div>
                             <span className="text-xs font-mono text-gray-400">

@@ -54,7 +54,7 @@ export function AuthProvider({ children }) {
     if (!supabase) { setLoading(false); return; }
 
     const initAuth = async () => {
-      logAuth('Init: v3.14 (AR-BETA) - Hash Protection');
+      logAuth('Init: v3.14.1 (AR-FIX) - Hash Protection');
 
       // 1. Check for OAuth Hash/Code
       const hash = window.location.hash;
