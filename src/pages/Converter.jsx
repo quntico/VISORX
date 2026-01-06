@@ -35,6 +35,57 @@ import { TGALoader } from 'three/examples/jsm/loaders/TGALoader.js';
 import JSZip from 'jszip'; // For ZIP support
 import { QRCodeSVG } from 'qrcode.react';
 
+// ==================== VIRTUAL JOYSTICK ====================
+const Joystick = ({ onMove }) => {
+    const [active, setActive] = useState(false);
+    const [pos, setPos] = useState({ x: 0, y: 0 });
+    const startPos = useRef({ x: 0, y: 0 });
+
+    const handleStart = (e) => {
+        const touch = e.touches[0];
+        startPos.current = { x: touch.clientX, y: touch.clientY };
+        setActive(true);
+    };
+
+    const handleMove = (e) => {
+        if (!active) return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - startPos.current.x;
+        const dy = touch.clientY - startPos.current.y;
+
+        // Clamp
+        const maxDist = 40;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const factor = dist > maxDist ? maxDist / dist : 1;
+
+        const clampedX = dx * factor;
+        const clampedY = dy * factor;
+
+        setPos({ x: clampedX, y: clampedY });
+        onMove({ x: clampedX / maxDist, y: clampedY / maxDist });
+    };
+
+    const handleEnd = () => {
+        setActive(false);
+        setPos({ x: 0, y: 0 });
+        onMove({ x: 0, y: 0 }); // Stop momentum
+    };
+
+    return (
+        <div
+            className="absolute bottom-32 right-8 w-24 h-24 bg-white/10 backdrop-blur-md rounded-full border-2 border-white/20 flex items-center justify-center touch-none sm:hidden z-50 shadow-[0_0_20px_rgba(0,255,255,0.2)]"
+            onTouchStart={handleStart}
+            onTouchMove={handleMove}
+            onTouchEnd={handleEnd}
+        >
+            <div
+                className={`w-10 h-10 rounded-full bg-cyan-500/80 shadow-[0_0_15px_rgba(34,211,238,0.8)] transition-transform duration-75 ${active ? 'scale-90' : 'scale-100'}`}
+                style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
+            />
+        </div>
+    );
+};
+
 function Converter() {
     const navigate = useNavigate();
     const { toast } = useToast();
