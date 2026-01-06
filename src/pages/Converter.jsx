@@ -89,18 +89,21 @@ function Converter() {
         }
     }, [user]);
 
-    const loadAllData = async () => {
-        // setRefreshingLibrary(true); // DISABLED: Suspected Loop Cause
+    const loadAllData = async (isManual = false) => {
+        // SAFE: Only show spinner on manual user click, never on auto-load
+        if (isManual) setRefreshingLibrary(true);
         setLibraryError(null);
         try {
             const projs = await listProjects(user);
             setProjects(projs);
 
-            // Polyfill for models
+            // Polyfill for models - NOW WITH CACHE BUSTING
+            // We use .limit(100) and a randomized filter if needed, but 'order' usually forces fetch
             const { data: models, error } = await supabase
                 .from('models')
                 .select('*')
                 .eq('user_id', user?.id)
+                .neq('id', '00000000-0000-0000-0000-000000000000') // Dummy filter to ensure non-cached query
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -112,7 +115,7 @@ function Converter() {
             setLibraryError(e.message);
             toast({ title: "Error de carga", description: "No se pudo cargar la librería.", variant: "destructive" });
         } finally {
-            // setRefreshingLibrary(false);
+            if (isManual) setRefreshingLibrary(false);
         }
     };
 
@@ -183,7 +186,7 @@ function Converter() {
             });
 
             toast({ title: "¡Guardado!", description: "Modelo añadido a tu librería." });
-            await loadAllData(); // Refresh list
+            await loadAllData(true); // Refresh list (as manual to show spinner)
 
         } catch (error) {
             console.error("Save Error:", error);
@@ -619,7 +622,7 @@ function Converter() {
                                 <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                 <span className="sm:hidden">Toolkit</span>
                                 <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                    v3.17.8
+                                    v3.17.9
                                 </span>
                             </h1>
                         </div>
@@ -797,7 +800,7 @@ function Converter() {
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold">Tu Librería</h3>
                             <div className="flex gap-2">
-                                <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading || refreshingLibrary}>
+                                <Button variant="ghost" size="sm" onClick={() => loadAllData(true)} disabled={loading || refreshingLibrary}>
                                     <RotateCw className={`h-4 w-4 ${refreshingLibrary ? 'animate-spin text-[#29B6F6]' : ''}`} />
                                 </Button>
                                 {/* Mobile Close Button */}
