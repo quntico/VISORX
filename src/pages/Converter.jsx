@@ -1,15 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon, Loader2, RotateCw, AlertCircle, Camera, BookOpen, Trash2, RefreshCw, Play, Pause, MoveVertical, Activity } from 'lucide-react';
+import { ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon, Loader2, RotateCw, AlertCircle, Camera, BookOpen, Trash2, RefreshCw, Play, Pause, MoveVertical, Activity, Video, Download, CornerUpLeft, CornerUpRight, ArrowUp, ArrowDown, ArrowRight, VideoOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/components/ui/use-toast';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
-import { listProjects, saveModelFlow, uploadModelToCloud } from '@/lib/data-service';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
     Dialog,
@@ -119,6 +113,11 @@ function Converter() {
     const [color, setColor] = useState("#ffffff");
     const [rotation, setRotation] = useState(0);
     const [verticalPos, setVerticalPos] = useState(0);
+    const [posX, setPosX] = useState(0); // Pan X
+    const [posZ, setPosZ] = useState(0); // Pan Z
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorderRef = useRef(null);
+    const chunksRef = useRef([]);
 
     // Dialogs
     const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -690,18 +689,6 @@ function Converter() {
 
         // CLEANUP
         return () => {
-            if (animationId) cancelAnimationFrame(animationId);
-
-            if (renderer) {
-                // AGGRESSIVE CLEANUP
-                renderer.dispose();
-                renderer.forceContextLoss();
-                renderer.domElement = null;
-                renderer = null;
-            }
-
-            if (mountRef.current) mountRef.current.innerHTML = '';
-
             // Dispose scene objects
             scene.traverse((object) => {
                 if (object.geometry) object.geometry.dispose();
@@ -855,8 +842,7 @@ function Converter() {
                     {/* React Overlay - LOADING / STATUS */}
                     {loading && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-50 text-white backdrop-blur-sm transition-all duration-300">
-                            {/* SAFE FALLBACK: No Icon, just text to prevent crash */}
-                            <div className="h-12 w-12 border-4 border-t-transparent border-[#29B6F6] rounded-full animate-spin mb-4"></div>
+                            <Loader2 className="h-12 w-12 text-[#29B6F6] animate-spin mb-4" />
                             <p className="font-mono text-lg font-bold tracking-wider">{uploadStatus || "Procesando..."}</p>
                             {progress > 0 && (
                                 <div className="mt-4 w-64">
@@ -871,6 +857,18 @@ function Converter() {
                             )}
                         </div>
                     )}
+
+                    {/* NEW UI: MOBILE CONTROLS */}
+                    {modelObject && <DPad onMove={({ x, z }) => {
+                        if (x) setPosX(prev => prev + x * 0.2);
+                        if (z) setPosZ(prev => prev + z * 0.2);
+                    }} />}
+
+                    {modelObject && <CaptureToolbar
+                        onScreenshot={handleScreenshot}
+                        onRecord={handleRecord}
+                        isRecording={isRecording}
+                    />}
 
                     {/* React Overlay - ERROR STATE */}
                     {loadError && (
@@ -1159,7 +1157,7 @@ function Converter() {
                     multiple
                 />
             </div>
-        </div>
+        </div >
     );
 }
 
