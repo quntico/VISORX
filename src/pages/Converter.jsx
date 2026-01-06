@@ -90,15 +90,17 @@ function Converter() {
     }, [user]);
 
     const loadAllData = async (isManual = false) => {
-        // SAFE: Only show spinner on manual user click, never on auto-load
-        if (isManual) setRefreshingLibrary(true);
+        // SAFE: Only show spinner on manual user click
+        if (isManual) {
+            setRefreshingLibrary(true);
+            setUserModels([]); // VISUAL PROOF: Clear list to show re-fetch happening
+        }
         setLibraryError(null);
         try {
             const projs = await listProjects(user);
             setProjects(projs);
 
             // Polyfill for models - NOW WITH CACHE BUSTING
-            // We use .limit(100) and a randomized filter if needed, but 'order' usually forces fetch
             const { data: models, error } = await supabase
                 .from('models')
                 .select('*')
@@ -110,6 +112,14 @@ function Converter() {
 
             setUserModels(models || []);
             console.log("Library loaded:", projs.length, "projects,", models?.length, "models");
+
+            if (isManual) {
+                toast({
+                    title: "Librería Actualizada",
+                    description: `Se encontraron ${models?.length || 0} modelos.`,
+                    duration: 3000
+                });
+            }
         } catch (e) {
             console.error("Error loading data:", e);
             setLibraryError(e.message);
@@ -186,6 +196,9 @@ function Converter() {
             });
 
             toast({ title: "¡Guardado!", description: "Modelo añadido a tu librería." });
+
+            // WAIT FOR DB PROPAGATION (1.5s)
+            await new Promise(r => setTimeout(r, 1500));
             await loadAllData(true); // Refresh list (as manual to show spinner)
 
         } catch (error) {
@@ -622,7 +635,7 @@ function Converter() {
                                 <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                 <span className="sm:hidden">Toolkit</span>
                                 <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                    v3.17.9
+                                    v3.17.10
                                 </span>
                             </h1>
                         </div>
