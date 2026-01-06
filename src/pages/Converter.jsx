@@ -90,7 +90,7 @@ function Converter() {
     }, [user]);
 
     const loadAllData = async () => {
-        setRefreshingLibrary(true);
+        // setRefreshingLibrary(true); // DISABLED: Suspected Loop Cause
         setLibraryError(null);
         try {
             const projs = await listProjects(user);
@@ -112,7 +112,7 @@ function Converter() {
             setLibraryError(e.message);
             toast({ title: "Error de carga", description: "No se pudo cargar la librería.", variant: "destructive" });
         } finally {
-            setRefreshingLibrary(false);
+            // setRefreshingLibrary(false);
         }
     };
 
@@ -619,7 +619,7 @@ function Converter() {
                                 <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                 <span className="sm:hidden">Toolkit</span>
                                 <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                    v3.17.6
+                                    v3.17.7
                                 </span>
                             </h1>
                         </div>
@@ -698,7 +698,8 @@ function Converter() {
                     {/* React Overlay - LOADING / STATUS */}
                     {loading && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-50 text-white backdrop-blur-sm transition-all duration-300">
-                            <Loader2 className="h-12 w-12 animate-spin text-[#29B6F6] mb-4" />
+                            {/* SAFE FALLBACK: No Icon, just text to prevent crash */}
+                            <div className="h-12 w-12 border-4 border-t-transparent border-[#29B6F6] rounded-full animate-spin mb-4"></div>
                             <p className="font-mono text-lg font-bold tracking-wider">{uploadStatus || "Procesando..."}</p>
                             {progress > 0 && (
                                 <div className="mt-4 w-64">
