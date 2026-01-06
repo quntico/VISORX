@@ -87,11 +87,13 @@ function Converter() {
     const autoRotateRef = useRef(false);
     const rotationSpeedRef = useRef(0.01);
     const modelRef = useRef(null); // Sync with modelObject
+    const isRxModeRef = useRef(false); // FOR PULSE
 
     // Sync Refs
     useEffect(() => { autoRotateRef.current = autoRotate; }, [autoRotate]);
     useEffect(() => { rotationSpeedRef.current = rotationSpeed; }, [rotationSpeed]);
     useEffect(() => { modelRef.current = modelObject; }, [modelObject]);
+    useEffect(() => { isRxModeRef.current = isRxMode; }, [isRxMode]);
 
     // Initial Load
     // 2) refetch único (User Request Pattern)
@@ -614,12 +616,20 @@ function Converter() {
             // AUTO ROTATION LOGIC
             if (autoRotateRef.current && modelRef.current) {
                 modelRef.current.rotation.y += rotationSpeedRef.current;
-                // Sync React state if needed? No, purely visual loop.
-                // But we might want to update the slider if it's dragging? 
-                // Let's just update the visual object. 
-                // To keep slider in sync would require state update which lags.
-                // detailed sync is complex, let's stick to visual rotate.
-                // NOTE: If user touches slider, it overrides this momentarily via prop update.
+            }
+
+            // RX MODE BREATHING PULSE (LED EFFECT)
+            if (isRxModeRef.current && modelRef.current) {
+                const time = Date.now() * 0.003; // Speed
+                const intensity = 0.5 + Math.sin(time) * 0.3; // Range 0.2 - 0.8
+
+                modelRef.current.traverse((child) => {
+                    if (child.isMesh && child.material && child.material.wireframe) {
+                        child.material.opacity = intensity;
+                        // Optional: Pulse color slightly?
+                        // child.material.color.setHSL(0.5, 1, intensity * 0.5 + 0.2); 
+                    }
+                });
             }
 
             controls.update();
@@ -829,6 +839,16 @@ function Converter() {
                                 </Button>
                             </div>
                         </div>
+                    )}
+
+                    {/* MOBILE JOYSTICK */}
+                    {modelObject && (
+                        <Joystick onMove={({ x, y }) => {
+                            // Sensitivity adjustments
+                            if (Math.abs(x) > 0.05) setRotation(prev => prev + x * 0.05);
+                            // Inverted Y for natural feel (Push Up = Go Up)
+                            if (Math.abs(y) > 0.05) setVerticalPos(prev => Math.max(-5, Math.min(5, prev - y * 0.05)));
+                        }} />
                     )}
 
                     {/* FUTURISTIC CONTROL DECK */}
