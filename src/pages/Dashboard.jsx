@@ -120,7 +120,13 @@ function Dashboard() {
   };
 
   const handleLogout = async () => {
-    await signOut();
+    try {
+      await signOut(); // AuthContext redirection handles this
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // Fallback force redirect
+      window.location.href = '/login';
+    }
   };
 
   const toggleLanguage = () => {
@@ -153,11 +159,12 @@ function Dashboard() {
                 <Cube className="h-8 w-8 text-[#29B6F6]" />
                 <div>
                   <h1 className="text-xl font-bold text-white">VISOR-X</h1>
+                  <span className="text-[10px] text-[#29B6F6] font-mono bg-[#29B6F6]/10 px-1.5 py-0.5 rounded border border-[#29B6F6]/20">v3.11 (DASH-FIX)</span>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-400 hidden sm:inline">{user?.email}</span>
-                <Button onClick={handleLogout} variant="outline" size="sm">
+                <Button onClick={handleLogout} variant="outline" size="sm" className="hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-colors">
                   <LogOut className="h-4 w-4 mr-2" /> {t('dashboard.logout')}
                 </Button>
               </div>
