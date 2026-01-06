@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 
-const APP_VERSION = '3.17.0';
+const APP_VERSION = '3.17.1';
 
 export function VersionManager() {
   const { toast } = useToast();
