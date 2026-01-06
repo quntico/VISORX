@@ -674,7 +674,7 @@ function Converter() {
                                 <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                 <span className="sm:hidden">Toolkit</span>
                                 <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                    v3.17.13
+                                    v3.17.14
                                 </span>
                             </h1>
                         </div>
