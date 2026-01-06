@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon, Loader2, RotateCw, AlertCircle, Camera, BookOpen, Trash2, RefreshCw } from 'lucide-react';
@@ -212,13 +212,25 @@ function Converter() {
 
             console.log("SAVE SUCCESS, Result:", result);
 
-            // OPTIMISTIC UPDATE: Show immediately!
+            // OPTIMISTIC UPDATE: Show immediately (User Request Pattern)
             if (result && result.id) {
-                setUserModels(prev => {
-                    const exists = prev.find(m => m.id === result.id);
-                    if (exists) return prev;
-                    return [result, ...prev];
-                });
+                setUserModels(prev => [{
+                    id: result.id,
+                    name: saveData.name || "Nuevo Modelo",
+                    created_at: new Date().toISOString(),
+                    file_path: result.file_path,
+                    user_id: user.id,
+                    ...result
+                }, ...prev]);
+            } else {
+                // Fallback if result is partial
+                setUserModels(prev => [{
+                    id: "temp",
+                    name: saveData.name,
+                    created_at: new Date().toISOString(),
+                    file_path: "",
+                    user_id: user?.id
+                }, ...prev]);
             }
 
             toast({ title: "¡Guardado!", description: "Modelo añadido a tu librería." });
