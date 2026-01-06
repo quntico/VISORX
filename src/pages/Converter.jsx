@@ -86,6 +86,60 @@ const Joystick = ({ onMove }) => {
     );
 };
 
+// ==================== D-PAD (WASD) ====================
+const DPad = ({ onMove }) => {
+    const timerRef = useRef(null);
+    const start = (delta) => {
+        onMove(delta);
+        timerRef.current = setInterval(() => onMove(delta), 30);
+    };
+    const stop = () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+    };
+
+    const btnClass = "w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:bg-cyan-500/50 transition-colors touch-none user-select-none";
+
+    return (
+        <div className="absolute bottom-32 left-8 w-32 h-32 touch-none sm:hidden z-50 grid grid-cols-3 grid-rows-3 gap-1 shadow-[0_0_20px_rgba(0,0,0,0.3)] bg-black/20 rounded-full p-1 transform rotate-45">
+            <div className="transform -rotate-45" /> {/* Corner */}
+            <div className={`${btnClass} transform -rotate-45`} onTouchStart={(e) => { e.preventDefault(); start({ z: -0.1 }) }} onTouchEnd={stop} onContextMenu={e => e.preventDefault()}>
+                <ArrowUp className="w-6 h-6 text-white" />
+            </div>
+            <div className="transform -rotate-45" />
+
+            <div className={`${btnClass} transform -rotate-45`} onTouchStart={(e) => { e.preventDefault(); start({ x: -0.1 }) }} onTouchEnd={stop} onContextMenu={e => e.preventDefault()}>
+                <ArrowLeft className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex items-center justify-center transform -rotate-45">
+                <div className="w-4 h-4 bg-white/30 rounded-full" />
+            </div>
+            <div className={`${btnClass} transform -rotate-45`} onTouchStart={(e) => { e.preventDefault(); start({ x: 0.1 }) }} onTouchEnd={stop} onContextMenu={e => e.preventDefault()}>
+                <ArrowRight className="w-6 h-6 text-white" />
+            </div>
+
+            <div className="transform -rotate-45" />
+            <div className={`${btnClass} transform -rotate-45`} onTouchStart={(e) => { e.preventDefault(); start({ z: 0.1 }) }} onTouchEnd={stop} onContextMenu={e => e.preventDefault()}>
+                <ArrowDown className="w-6 h-6 text-white" />
+            </div>
+            <div className="transform -rotate-45" />
+        </div>
+    );
+};
+
+// ==================== CAPTURE TOOLBAR ====================
+const CaptureToolbar = ({ onScreenshot, onRecord, isRecording }) => {
+    return (
+        <div className="absolute top-24 right-4 flex flex-col gap-3 z-50">
+            <Button size="icon" variant="secondary" className="rounded-full w-12 h-12 bg-black/60 border-white/20 text-white backdrop-blur-md" onClick={onScreenshot}>
+                <Camera className="w-5 h-5" />
+            </Button>
+            <Button size="icon" variant={isRecording ? "destructive" : "secondary"} className={`rounded-full w-12 h-12 border-white/20 text-white backdrop-blur-md ${isRecording ? 'animate-pulse' : 'bg-black/60'}`} onClick={onRecord}>
+                {isRecording ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+            </Button>
+        </div>
+    );
+};
+
 function Converter() {
     const navigate = useNavigate();
     const { toast } = useToast();
