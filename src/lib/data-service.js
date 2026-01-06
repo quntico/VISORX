@@ -108,13 +108,17 @@ export async function markProjectError(projectId, message) {
 }
 
 async function pickBucket() {
-  // Try buckets in order; first that responds to list works.
+  // FAST TRACK: Always try 'models' first without listing (avoids RLS listing errors)
+  return 'models';
+
+  /* 
+  // Old Logic (Too Fragile)
   for (const b of DEFAULT_BUCKETS) {
     const { error } = await supabase.storage.from(b).list('', { limit: 1 });
     if (!error) return b;
   }
-  // If all fail, just return first and let upload throw a useful error.
   return DEFAULT_BUCKETS[0];
+  */
 }
 
 function safeName(name = 'file') {
@@ -142,6 +146,8 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser }) 
   onStep?.({ step: 2, total: 3, message: `Subiendo archivo a la nube (${bucket})...` });
   console.log("STEP 6: Starting Storage Upload to:", path);
 
+  const mimeType = file.type || (ext === 'glb' ? 'model/gltf-binary' : 'application/octet-stream');
+
   await retry(async (attempt) => {
     console.log(`STEP 6b: Upload attempt ${attempt + 1}`);
     const uploadPromise = supabase.storage
@@ -149,7 +155,7 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser }) 
       .upload(path, file, {
         upsert: true,
         cacheControl: '3600',
-        contentType: file.type || undefined
+        contentType: mimeType
       });
 
     const { data, error } = await withTimeout(uploadPromise, 20000, 'storage.upload');
