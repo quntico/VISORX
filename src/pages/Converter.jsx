@@ -481,7 +481,7 @@ function Converter() {
             {/* DEBUG CONSOLE (Fixed Visibility) */}
             <div className="fixed top-24 right-4 z-[99999] bg-zinc-950 border-2 border-red-500 p-4 rounded-lg shadow-2xl text-xs font-mono text-white w-72 backdrop-blur-sm">
                 <h3 className="font-bold border-b border-red-500/30 pb-1 mb-2 text-red-400 flex justify-between items-center">
-                    <span>DEBUGGER v3.2</span>
+                    <span>DEBUGGER v3.7</span>
                     <span className={user ? "text-green-400" : "text-red-500"}>●</span>
                 </h3>
 
@@ -545,7 +545,7 @@ function Converter() {
                             <h1 className="text-xl font-bold flex items-center gap-2">
                                 Toolkit & Convertidor
                                 <span className="bg-blue-900/50 text-blue-200 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 font-mono">
-                                    v3.6 (HASHFIX)
+                                    v3.7 (SECURE-AUTH)
                                 </span>
                             </h1>
                         </div>
