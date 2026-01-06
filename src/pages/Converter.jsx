@@ -506,7 +506,10 @@ function Converter() {
 
                 <div className="grid grid-cols-2 gap-2">
                     <button
-                        onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } })}
+                        onClick={() => supabase.auth.signInWithOAuth({
+                            provider: 'google',
+                            options: { redirectTo: window.location.origin + window.location.pathname }
+                        })}
                         className="bg-red-900/50 hover:bg-red-700 border border-red-700 text-red-100 p-2 rounded transition-colors"
                     >
                         LOGIN
@@ -551,7 +554,7 @@ function Converter() {
                                     // FORCE REDIRECT TO CURRENT PAGE (Avoids /dashboard logic mismatch)
                                     supabase.auth.signInWithOAuth({
                                         provider: 'google',
-                                        options: { redirectTo: window.location.href }
+                                        options: { redirectTo: window.location.origin + window.location.pathname }
                                     });
                                 } else {
                                     // Debug: Log session
