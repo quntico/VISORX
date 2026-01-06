@@ -485,6 +485,10 @@ function Converter() {
                     <span className={user ? "text-green-400" : "text-red-500"}>●</span>
                 </h3>
 
+                <div className="bg-[#151B23] px-3 py-1.5 rounded border border-[#1E293B]">
+                    <span className="text-[#29B6F6] text-xs font-bold">v3.7</span>
+                    <span className="text-gray-500 text-[10px] ml-2 font-mono">(SECURE-AUTH)</span>
+                </div>
                 <div className="space-y-2 mb-4">
                     <div className="flex justify-between">
                         <span className="text-gray-500">Status:</span>
@@ -565,165 +569,169 @@ function Converter() {
                             title={user ? `User: ${user.id} (Click for Details)` : "OFFLINE: Click to Connect"}
                         >
                             {/* Auth LED */}
-                            <div className="flex items-center gap-2">
-                                <div className={`w-3 h-3 rounded-full ${user ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-red-500 animate-pulse"}`} />
-                                <span className="text-xs font-mono text-gray-400">
-                                    {user ? "ONLINE" : "OFFLINE (LOGIN)"}
-                                </span>
+                            <div className="flex justify-between items-center mb-3 border-b border-red-900/30 pb-2">
+                                <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">DEBUGGER v3.7</span>
+                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
                             </div>
-                            <div className="w-px h-4 bg-white/20" />
-                            {/* Status Text */}
-                            <span className="text-xs text-blue-400">
-                                {loading ? (uploadStatus || "Procesando...") : "Listo para trabajar"}
+                            <span className="text-xs font-mono text-gray-400">
+                                {user ? "ONLINE" : "OFFLINE (LOGIN)"}
                             </span>
                         </div>
-
-                        <Button variant="ghost" size="sm" onClick={() => setShowLibrary(!showLibrary)}>
-                            <BookOpen className="h-4 w-4 mr-2" /> Librería
-                        </Button>
+                        <div className="w-px h-4 bg-white/20" />
+                        {/* Status Text */}
+                        <span className="text-xs text-blue-400">
+                            {loading ? (uploadStatus || "Procesando...") : "Listo para trabajar"}
+                        </span>
                     </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setShowUploadDialog(true)}>
-                            <Upload className="h-4 w-4 mr-2" /> Subir ZIP/Pack
-                        </Button>
-                        <Button onClick={() => setShowSaveDialog(true)} disabled={!modelObject}>
-                            <Save className="h-4 w-4 mr-2" /> Guardar en Proyecto
-                        </Button>
-                        <Button variant="secondary" onClick={confirmSaveToProject} disabled={!modelObject}>
-                            <Save className="h-4 w-4 mr-2" /> Autosave Test
-                        </Button>
+
+                    <Button variant="ghost" size="sm" onClick={() => setShowLibrary(!showLibrary)}>
+                        <BookOpen className="h-4 w-4 mr-2" /> Librería
+                    </Button>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowUploadDialog(true)}>
+                        <Upload className="h-4 w-4 mr-2" /> Subir ZIP/Pack
+                    </Button>
+                    <Button onClick={() => setShowSaveDialog(true)} disabled={!modelObject}>
+                        <Save className="h-4 w-4 mr-2" /> Guardar en Proyecto
+                    </Button>
+                    <Button variant="secondary" onClick={confirmSaveToProject} disabled={!modelObject}>
+                        <Save className="h-4 w-4 mr-2" /> Autosave Test
+                    </Button>
+                </div>
+        </div>
+            </header >
+
+        <div className="flex-1 flex overflow-hidden">
+
+            {/* 3D View */}
+            <div
+                className="flex-1 relative bg-black/50"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    const files = Array.from(e.dataTransfer.files);
+                    if (files.length > 0) processFiles(files);
+                }}
+            >
+                {/* Three.js Container */}
+                <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
+
+                {/* React Overlay - Empty State */}
+                {!modelObject && (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none">
+                        <p>Arrastra un archivo aquí o usa "Subir ZIP"</p>
                     </div>
-                </div>
-            </header>
+                )}
 
-            <div className="flex-1 flex overflow-hidden">
+                {/* CONTROL BAR (RESTORED) */}
+                {modelObject && (
+                    <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-[#151B23]/90 border border-white/10 p-3 rounded-lg backdrop-blur-md flex items-center gap-6 shadow-xl z-10 w-[90%] max-w-2xl justify-around">
 
-                {/* 3D View */}
-                <div
-                    className="flex-1 relative bg-black/50"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                        e.preventDefault();
-                        const files = Array.from(e.dataTransfer.files);
-                        if (files.length > 0) processFiles(files);
-                    }}
-                >
-                    {/* Three.js Container */}
-                    <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
-
-                    {/* React Overlay - Empty State */}
-                    {!modelObject && (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none">
-                            <p>Arrastra un archivo aquí o usa "Subir ZIP"</p>
+                        {/* Rotation */}
+                        <div className="flex flex-col items-center gap-1 w-32">
+                            <span className="text-[10px] text-gray-400 font-mono uppercase">Rotación</span>
+                            <Slider
+                                value={[rotation]}
+                                min={0} max={6.28} step={0.1}
+                                onValueChange={([v]) => setRotation(v)}
+                                className="w-full"
+                            />
                         </div>
-                    )}
 
-                    {/* CONTROL BAR (RESTORED) */}
-                    {modelObject && (
-                        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-[#151B23]/90 border border-white/10 p-3 rounded-lg backdrop-blur-md flex items-center gap-6 shadow-xl z-10 w-[90%] max-w-2xl justify-around">
+                        {/* Height */}
+                        <div className="flex flex-col items-center gap-1 w-32">
+                            <span className="text-[10px] text-gray-400 font-mono uppercase">Altura</span>
+                            <Slider
+                                value={[verticalPos]}
+                                min={-5} max={5} step={0.1}
+                                onValueChange={([v]) => setVerticalPos(v)}
+                                className="w-full"
+                            />
+                        </div>
 
-                            {/* Rotation */}
-                            <div className="flex flex-col items-center gap-1 w-32">
-                                <span className="text-[10px] text-gray-400 font-mono uppercase">Rotación</span>
-                                <Slider
-                                    value={[rotation]}
-                                    min={0} max={6.28} step={0.1}
-                                    onValueChange={([v]) => setRotation(v)}
-                                    className="w-full"
+                        {/* Color Toggle */}
+                        <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-gray-400 font-mono uppercase">Pintura</span>
+                                <Switch checked={isRxMode} onCheckedChange={setIsRxMode} />
+                            </div>
+                            {isRxMode && (
+                                <input
+                                    type="color"
+                                    value={color}
+                                    onChange={(e) => setColor(e.target.value)}
+                                    className="w-8 h-6 bg-transparent cursor-pointer"
                                 />
-                            </div>
-
-                            {/* Height */}
-                            <div className="flex flex-col items-center gap-1 w-32">
-                                <span className="text-[10px] text-gray-400 font-mono uppercase">Altura</span>
-                                <Slider
-                                    value={[verticalPos]}
-                                    min={-5} max={5} step={0.1}
-                                    onValueChange={([v]) => setVerticalPos(v)}
-                                    className="w-full"
-                                />
-                            </div>
-
-                            {/* Color Toggle */}
-                            <div className="flex flex-col items-center gap-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] text-gray-400 font-mono uppercase">Pintura</span>
-                                    <Switch checked={isRxMode} onCheckedChange={setIsRxMode} />
-                                </div>
-                                {isRxMode && (
-                                    <input
-                                        type="color"
-                                        value={color}
-                                        onChange={(e) => setColor(e.target.value)}
-                                        className="w-8 h-6 bg-transparent cursor-pointer"
-                                    />
-                                )}
-                            </div>
-
-                            {/* Reset */}
-                            <Button variant="ghost" size="icon" onClick={resetCamera} title="Reset Camera">
-                                <RefreshCw className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Library Sidebar */}
-                {showLibrary && (
-                    <div className="w-80 border-l border-white/10 bg-[#151B23] p-4 overflow-y-auto flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold">Tu Librería</h3>
-                            <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading}>
-                                <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                            </Button>
-                        </div>
-
-                        {/* Error Message */}
-                        {libraryError && (
-                            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded mb-4 text-xs text-red-200">
-                                ⚠️ {libraryError}
-                            </div>
-                        )}
-
-                        {/* Projects / Models List */}
-                        <div className="space-y-4 flex-1">
-                            {userModels.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    <BoxIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">No tienes modelos guardados.</p>
-                                    <p className="text-xs mt-1">Sube uno para empezar.</p>
-                                </div>
-                            ) : (
-                                userModels.map(m => (
-                                    <div key={m.id} className="p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer group" onClick={() => handleLoadModel(m)}>
-                                        <div className="flex justify-between">
-                                            <p className="font-medium truncate" title={m.name || m.file_name}>
-                                                {m.name || m.file_name}
-                                            </p>
-                                            <Trash2 className="h-4 w-4 text-red-500 opacity-0 group-hover:opacity-100"
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteModel(e, m.id); }} />
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1 flex justify-between">
-                                            <span>{(m.size / 1024 / 1024).toFixed(1)} MB</span>
-                                            <span className="text-gray-600">{new Date(m.created_at).toLocaleDateString()}</span>
-                                        </p>
-                                    </div>
-                                ))
                             )}
                         </div>
+
+                        {/* Reset */}
+                        <Button variant="ghost" size="icon" onClick={resetCamera} title="Reset Camera">
+                            <RefreshCw className="h-4 w-4" />
+                        </Button>
                     </div>
                 )}
             </div>
 
-            {/* Overlays - Force FIXED to cover confirmed dialogs and everything */}
-            {loading && (
-                <div className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-[9999]">
-                    <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
-                    <p className="text-xl font-bold text-white">{uploadStatus || "Cargando..."}</p>
-                    {progress > 0 && <p className="text-lg text-blue-400 mt-2">{progress}%</p>}
+            {/* Library Sidebar */}
+            {showLibrary && (
+                <div className="w-80 border-l border-white/10 bg-[#151B23] p-4 overflow-y-auto flex flex-col">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold">Tu Librería</h3>
+                        <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading}>
+                            <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                        </Button>
+                    </div>
+
+                    {/* Error Message */}
+                    {libraryError && (
+                        <div className="p-3 bg-red-500/20 border border-red-500/50 rounded mb-4 text-xs text-red-200">
+                            ⚠️ {libraryError}
+                        </div>
+                    )}
+
+                    {/* Projects / Models List */}
+                    <div className="space-y-4 flex-1">
+                        {userModels.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                                <BoxIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                <p className="text-sm">No tienes modelos guardados.</p>
+                                <p className="text-xs mt-1">Sube uno para empezar.</p>
+                            </div>
+                        ) : (
+                            userModels.map(m => (
+                                <div key={m.id} className="p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer group" onClick={() => handleLoadModel(m)}>
+                                    <div className="flex justify-between">
+                                        <p className="font-medium truncate" title={m.name || m.file_name}>
+                                            {m.name || m.file_name}
+                                        </p>
+                                        <Trash2 className="h-4 w-4 text-red-500 opacity-0 group-hover:opacity-100"
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteModel(e, m.id); }} />
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1 flex justify-between">
+                                        <span>{(m.size / 1024 / 1024).toFixed(1)} MB</span>
+                                        <span className="text-gray-600">{new Date(m.created_at).toLocaleDateString()}</span>
+                                    </p>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
             )}
-            {/* Inputs and Dialogs */}
+        </div>
+
+    {/* Overlays - Force FIXED to cover confirmed dialogs and everything */ }
+    {
+        loading && (
+            <div className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-[9999]">
+                <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
+                <p className="text-xl font-bold text-white">{uploadStatus || "Cargando..."}</p>
+                {progress > 0 && <p className="text-lg text-blue-400 mt-2">{progress}%</p>}
+            </div>
+        )
+    }
+    {/* Inputs and Dialogs */ }
             <input
                 type="file"
                 ref={fileInput3DRef}
