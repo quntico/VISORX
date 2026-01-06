@@ -54,7 +54,7 @@ export function AuthProvider({ children }) {
     if (!supabase) { setLoading(false); return; }
 
     const initAuth = async () => {
-      logAuth('Init: v3.11 (DASH-FIX) - Hash Protection');
+      logAuth('Init: v3.12 (WEBGL-FIX) - Hash Protection');
 
       // 1. Check for OAuth Hash/Code
       const hash = window.location.hash;

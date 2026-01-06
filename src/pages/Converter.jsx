@@ -414,11 +414,33 @@ function Converter() {
         camera.position.set(5, 5, 5);
         cameraRef.current = camera;
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(w, h);
-        mountRef.current.innerHTML = '';
-        mountRef.current.appendChild(renderer.domElement);
-        rendererRef.current = renderer;
+        // Initialize Renderer with Error Handling
+        let renderer = null;
+        try {
+            renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: true,
+                powerPreference: 'high-performance', // Try to get best GPU
+                failIfMajorPerformanceCaveat: true   // Fail fast if no hardware accel
+            });
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio for perf
+            mountRef.current.innerHTML = '';
+            mountRef.current.appendChild(renderer.domElement);
+            rendererRef.current = renderer;
+        } catch (e) {
+            console.error("WebGL Init Failed:", e);
+            // Show a friendly error in the mount point
+            mountRef.current.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:red;text-align:center;padding:20px;">
+                    <h3 style="font-weight:bold;margin-bottom:10px;">Error Gráfico (WebGL)</h3>
+                    <p style="font-size:12px;">El navegador no pudo iniciar el motor 3D.</p>
+                    <p style="font-size:10px;opacity:0.7;margin-top:5px;">Posible causa: Demasiadas pestañas con 3D abiertas.</p>
+                    <button onclick="window.location.reload()" style="margin-top:15px;padding:8px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Recargar Página</button>
+                </div>
+            `;
+            return;
+        }
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controlsRef.current = controls;
@@ -430,16 +452,40 @@ function Converter() {
         scene.add(dir);
         scene.add(new THREE.GridHelper(20, 20));
 
+        // Animation Loop
+        let animationId;
         const animate = () => {
-            requestAnimationFrame(animate);
+            animationId = requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
         };
         animate();
 
+        // CLEANUP
         return () => {
-            renderer.dispose();
+            if (animationId) cancelAnimationFrame(animationId);
+
+            if (renderer) {
+                // AGGRESSIVE CLEANUP
+                renderer.dispose();
+                renderer.forceContextLoss();
+                renderer.domElement = null;
+                renderer = null;
+            }
+
             if (mountRef.current) mountRef.current.innerHTML = '';
+
+            // Dispose scene objects
+            scene.traverse((object) => {
+                if (object.geometry) object.geometry.dispose();
+                if (object.material) {
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach(material => material.dispose());
+                    } else {
+                        object.material.dispose();
+                    }
+                }
+            });
         };
     }, [activeTab]);
 
@@ -481,12 +527,12 @@ function Converter() {
             {/* DEBUG CONSOLE (Fixed Visibility) */}
             <div className="fixed top-24 right-4 z-[99999] bg-zinc-950 border-2 border-red-500 p-4 rounded-lg shadow-2xl text-xs font-mono text-white w-72 backdrop-blur-sm">
                 <h3 className="font-bold border-b border-red-500/30 pb-1 mb-2 text-red-400 flex justify-between items-center">
-                    <span>DEBUGGER v3.11</span>
+                    <span>DEBUGGER v3.12</span>
                     <span className={user ? "text-green-400" : "text-red-500"}>●</span>
                 </h3>
 
                 <div className="bg-[#151B23] px-3 py-1.5 rounded border border-[#1E293B]">
-                    <span className="text-[#29B6F6] text-xs font-bold">v3.11</span>
+                    <span className="text-[#29B6F6] text-xs font-bold">v3.12</span>
                     <span className="text-gray-500 text-[10px] ml-2 font-mono">(SECURE-AUTH)</span>
                 </div>
                 <div className="space-y-2 mb-4">
@@ -545,7 +591,7 @@ function Converter() {
                             <h1 className="text-xl font-bold flex items-center gap-2">
                                 Toolkit & Convertidor
                                 <span className="bg-blue-900/50 text-blue-200 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 font-mono">
-                                    v3.11 (DASH-FIX)
+                                    v3.12 (WEBGL-FIX)
                                 </span>
                             </h1>
                         </div>
@@ -570,7 +616,7 @@ function Converter() {
                         >
                             {/* Auth LED */}
                             <div className="flex justify-between items-center mb-3 border-b border-red-900/30 pb-2">
-                                <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">DEBUGGER v3.11</span>
+                                <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">DEBUGGER v3.12</span>
                                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
                             </div>
                             <span className="text-xs font-mono text-gray-400">
