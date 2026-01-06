@@ -116,7 +116,7 @@ function Converter() {
 
             const { data, error } = await supabase
                 .from("models")
-                .select("id,name,created_at,file_path,project_id,user_id")
+                .select("id,name,created_at,file_path,file_url,project_id,user_id")
                 .eq("user_id", currentUser.id)
                 .order("created_at", { ascending: false });
 
@@ -531,7 +531,8 @@ function Converter() {
         if (!m.file_url) return;
         setLoading(true);
         // Simple load from URL
-        const ext = m.file_name?.split('.').pop().toLowerCase() || 'glb';
+        const filename = m.file_name || m.file_path || m.file_url || "";
+        const ext = filename.split('.').pop().toLowerCase();
         const url = m.file_url;
 
         const manager = new THREE.LoadingManager();
