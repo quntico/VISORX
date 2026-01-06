@@ -199,21 +199,33 @@ function Converter() {
 
             setUploadStatus("Enviando a la nube...");
 
-            await saveModelFlow({
+            // EXECUTE SAVE FLOW
+            const result = await saveModelFlow({
                 file: fileToUpload,
                 selectedProjectId: targetProjectId,
-                authUser: user, // <--- EXPLICITLY PASS THE AUTH USER
+                authUser: user,
                 onStep: (info) => {
                     setUploadStatus(info.message);
                     setProgress(Math.round((info.step / info.total) * 100));
                 }
             });
 
+            console.log("SAVE SUCCESS, Result:", result);
+
+            // OPTIMISTIC UPDATE: Show immediately!
+            if (result && result.id) {
+                setUserModels(prev => {
+                    const exists = prev.find(m => m.id === result.id);
+                    if (exists) return prev;
+                    return [result, ...prev];
+                });
+            }
+
             toast({ title: "¡Guardado!", description: "Modelo añadido a tu librería." });
 
-            // WAIT FOR DB PROPAGATION (1.5s)
-            await new Promise(r => setTimeout(r, 1500));
-            await loadAllData(true); // Refresh list (as manual to show spinner)
+            // Force strict sync (background) w/ delay
+            await new Promise(r => setTimeout(r, 500));
+            await refetchLibrary(false);
 
         } catch (error) {
             console.error("Save Error:", error);
@@ -649,7 +661,7 @@ function Converter() {
                                 <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                 <span className="sm:hidden">Toolkit</span>
                                 <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                    v3.17.11
+                                    v3.17.12
                                 </span>
                             </h1>
                         </div>
