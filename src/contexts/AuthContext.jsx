@@ -209,10 +209,26 @@ export function AuthProvider({ children }) {
   }, []); // Remove dependencies to prevent re-runs
 
   const signInWithGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` }
-    });
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        }
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error("Login Error:", error);
+      toast({
+        title: "Error al iniciar sesión",
+        description: error.message || "No se pudo conectar con Google.",
+        variant: "destructive"
+      });
+    }
   };
 
   const signOut = async () => {
