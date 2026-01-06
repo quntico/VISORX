@@ -675,12 +675,7 @@ function Converter() {
                     {/* React Overlay - Empty State */}
                     {!modelObject && !loadError && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 pointer-events-none p-4 text-center">
-                            <p className="mb-2">Arrastra un archivo aquí o usa "Subir ZIP"</p>
-                            <p className="text-xs text-gray-600 max-w-xs">
-                                Soporta: .GLB, .FBX, .OBJ, .STL, .DAE
-                                <br />
-                                <span className="text-[#29B6F6]">Para texturas en FBX/OBJ: Sube un .ZIP con el modelo y las imágenes.</span>
-                            </p>
+                            <p className="text-sm">Arrastra tu archivo o ZIP aquí</p>
                         </div>
                     )}
 
