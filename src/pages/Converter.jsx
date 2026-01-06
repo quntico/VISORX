@@ -875,6 +875,16 @@ function Converter() {
                         </div>
                     </DialogContent>
                 </Dialog>
+
+                {/* HIDDEN INPUT FOR UPLOAD */}
+                <input
+                    type="file"
+                    ref={fileInput3DRef}
+                    onChange={handle3DFileChange}
+                    accept=".gltf,.glb,.obj,.fbx,.dae,.zip,.rar"
+                    className="hidden"
+                    multiple
+                />
             </div>
         </div>
     );
