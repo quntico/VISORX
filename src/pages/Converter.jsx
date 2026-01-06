@@ -49,6 +49,7 @@ function Converter() {
     const [projects, setProjects] = useState([]);
     const [userModels, setUserModels] = useState([]);
     const [uploadStatus, setUploadStatus] = useState("");
+    const [refreshingLibrary, setRefreshingLibrary] = useState(false); // Local loading state for library
     const [saveData, setSaveData] = useState({ name: '', projectId: '' });
     const [largeFileToUpload, setLargeFileToUpload] = useState(null);
 
@@ -89,22 +90,17 @@ function Converter() {
     }, [user]);
 
     const loadAllData = async () => {
-
-        // ... (keep existing loadAllData, listProjects, etc. - skipping for brevity if not modifying) ...
-        // BUT replace_file_content doesn't like skipping if I target a block. 
-        // I will use multiple ReplaceFileContent calls or target specific areas.
-        // I will target the stated variables first.
-
+        setRefreshingLibrary(true);
         setLibraryError(null);
         try {
             const projs = await listProjects(user);
             setProjects(projs);
 
-            // Polyfill for models (since data-service might not export it yet)
+            // Polyfill for models
             const { data: models, error } = await supabase
                 .from('models')
                 .select('*')
-                .eq('user_id', user?.id) // Explicitly filter by user to be safe, though RLS should handle it
+                .eq('user_id', user?.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -115,6 +111,8 @@ function Converter() {
             console.error("Error loading data:", e);
             setLibraryError(e.message);
             toast({ title: "Error de carga", description: "No se pudo cargar la librería.", variant: "destructive" });
+        } finally {
+            setRefreshingLibrary(false);
         }
     };
 
@@ -621,7 +619,7 @@ function Converter() {
                                 <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                 <span className="sm:hidden">Toolkit</span>
                                 <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                    v3.17.5
+                                    v3.17.6
                                 </span>
                             </h1>
                         </div>
@@ -798,8 +796,8 @@ function Converter() {
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold">Tu Librería</h3>
                             <div className="flex gap-2">
-                                <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading}>
-                                    <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                                <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading || refreshingLibrary}>
+                                    <RotateCw className={`h-4 w-4 ${refreshingLibrary ? 'animate-spin text-[#29B6F6]' : ''}`} />
                                 </Button>
                                 {/* Mobile Close Button */}
                                 <Button variant="ghost" size="sm" className="sm:hidden" onClick={() => setShowLibrary(false)}>
