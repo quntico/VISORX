@@ -570,12 +570,11 @@ function Converter() {
         <div className="min-h-screen bg-[#0B0F14] text-white flex flex-col h-screen overflow-hidden">
 
             const [showDebugDialog, setShowDebugDialog] = useState(false);
-
             return (
             <div className="min-h-screen bg-[#0B0F14] text-white flex flex-col h-screen overflow-hidden">
 
                 {/* Header */}
-                <header className="border-b border-[#29B6F6]/20 bg-[#151B23] p-4 shrink-0">
+                <header className="border-b border-[#29B6F6]/20 bg-[#151B23] p-4 shrink-0 z-20 relative">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <Button variant="ghost" onClick={() => navigate('/dashboard')}>
@@ -585,8 +584,8 @@ function Converter() {
                                 <h1 className="text-xl font-bold flex items-center gap-2">
                                     <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                     <span className="sm:hidden">Toolkit</span>
-                                    <span className="bg-red-900/50 text-red-200 text-[10px] px-2 py-0.5 rounded border border-red-500/30 font-mono">
-                                        v3.15.3 (NUCLEAR)
+                                    <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
+                                        v3.16.0
                                     </span>
                                 </h1>
                             </div>
@@ -595,24 +594,21 @@ function Converter() {
                             <div
                                 className="flex items-center gap-2 px-3 py-1 bg-black/30 rounded-full border border-white/10 hover:bg-white/10 cursor-pointer transition-colors"
                                 onClick={() => setShowDebugDialog(true)}
-                                title="Estado del Sistema"
                             >
                                 <div className={`w-2 h-2 rounded-full ${user ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-red-500 animate-pulse"}`}></div>
                                 <span className="text-xs font-mono text-gray-300 hidden sm:inline">
                                     {user ? "ONLINE" : "OFFLINE"}
                                 </span>
                             </div>
-
-                            <div className="hidden sm:block w-px h-4 bg-white/20" />
-
-                            <span className="text-xs text-blue-400 hidden sm:inline">
-                                {loading ? (uploadStatus || "Procesando...") : "Listo"}
-                            </span>
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {/* Mobile Actions Menu could go here, for now buttons wrap or scroll */}
-                            <Button variant="ghost" size="sm" onClick={() => setShowLibrary(!showLibrary)} className={showLibrary ? "bg-white/10" : ""}>
+                            <Button
+                                variant={showLibrary ? "default" : "ghost"}
+                                size="sm"
+                                onClick={() => setShowLibrary(!showLibrary)}
+                                className={showLibrary ? "bg-[#29B6F6] text-black hover:bg-[#29B6F6]/90" : ""}
+                            >
                                 <BookOpen className="h-4 w-4 sm:mr-2" />
                                 <span className="hidden sm:inline">Librería</span>
                             </Button>
@@ -693,8 +689,8 @@ function Converter() {
 
                                 {/* Version Display */}
                                 <div className="bg-[#151B23] px-3 py-1.5 rounded border border-[#1E293B]">
-                                    <span className="text-red-400 text-xs font-bold">v3.15.3</span>
-                                    <span className="text-gray-500 text-[10px] ml-2 font-mono">(NUCLEAR)</span>
+                                    <span className="text-[#29B6F6] text-xs font-bold">v3.16.0</span>
+                                    <span className="text-gray-500 text-[10px] ml-2 font-mono">(MOBILE-REV)</span>
                                 </div>
 
                                 {/* Color Toggle */}
