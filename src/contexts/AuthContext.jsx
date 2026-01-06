@@ -170,7 +170,17 @@ export function AuthProvider({ children }) {
         if (window.location.pathname === '/login') {
           window.location.replace('/dashboard');
         }
-      } else if (event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESH_FAILED') {
+        if (event === 'TOKEN_REFRESH_FAILED') {
+          console.warn("CRITICAL: Token Refresh Failed. Nuking storage.");
+          localStorage.removeItem('visorx_user');
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-')) localStorage.removeItem(key);
+          });
+          window.location.reload();
+          return;
+        }
+
         // Protect dev user
         const storedUser = localStorage.getItem('visorx_user');
         if (!storedUser?.includes('dev_user')) {
