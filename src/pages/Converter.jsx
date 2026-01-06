@@ -96,6 +96,10 @@ function Converter() {
                 return;
             }
 
+            // RESTORED: Fetch Projects alongside Models
+            const projs = await listProjects(currentUser);
+            setProjects(projs || []);
+
             const { data, error } = await supabase
                 .from("models")
                 .select("id,name,created_at,file_path,project_id,user_id")
