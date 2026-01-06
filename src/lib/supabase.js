@@ -1,31 +1,31 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
-// 1. Configuración (Prioridad a ENV, Fallback a hardcoded si falla)
-const envUrl = import.meta.env.VITE_SUPABASE_URL;
-const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Fallbacks (Solo para emergencia/debug)
-const fallbackUrl = 'https://uufffrsgpdcocosfukjm.supabase.co';
-const fallbackKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV1ZmZmcnNncGRjb2Nvc2Z1a2ptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxMzY5NjQsImV4cCI6MjA4MjcxMjk2NH0.V9RowV3qG8Kv9cDBTXMJsL3NkHNSUhiKvZAVBOcgcs4';
+// Storage wrapper (evita crashes si algo bloquea localStorage)
+const safeStorage = {
+  getItem: (key) => {
+    try { return window.localStorage.getItem(key); } catch { return null; }
+  },
+  setItem: (key, value) => {
+    try { window.localStorage.setItem(key, value); } catch { }
+  },
+  removeItem: (key) => {
+    try { window.localStorage.removeItem(key); } catch { }
+  },
+};
 
-export const supabaseUrl = envUrl || fallbackUrl;
-export const supabaseAnonKey = envKey || fallbackKey;
+export const isSupabaseConfigured = () => {
+  return !!supabaseUrl && !!supabaseAnonKey;
+};
 
-console.log("🔌 [Supabase] Iniciando...", {
-  url: supabaseUrl ? `${supabaseUrl.substring(0, 15)}...` : 'MISSING',
-  usingEnv: !!envUrl
-});
-
-// 2. Crear Cliente Único
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
+    detectSessionInUrl: true, // IMPORTANTÍSIMO si usas #access_token
+    storage: safeStorage,
+    flowType: "implicit", // si tu URL trae #access_token (si usas PKCE, cambia a "pkce")
+  },
 });
-
-// 3. Helper de verificación
-export const isSupabaseConfigured = () => {
-  return !!supabaseUrl && !!supabaseAnonKey;
-};

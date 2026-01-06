@@ -113,7 +113,7 @@ function Login() {
               </div>
               <div className="ml-3">
                 <h1 className="text-2xl font-bold text-white">VISOR-X</h1>
-                <p className="text-xs text-[#29B6F6]">v3.12-WebGL</p>
+                <p className="text-xs text-[#29B6F6]">v3.13-Boot</p>
               </div>
             </div>
 
