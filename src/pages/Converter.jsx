@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon, Loader2, RotateCw, AlertCircle, Camera, BookOpen, Trash2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon, Loader2, RotateCw, AlertCircle, Camera, BookOpen, Trash2, RefreshCw, Play, Pause, MoveVertical, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -76,8 +76,22 @@ function Converter() {
     const [helpContent, setHelpContent] = useState(null);
 
     const [libraryError, setLibraryError] = useState(null);
-    const [loadError, setLoadError] = useState(null); // NEW: Track load errors
+    const [loadError, setLoadError] = useState(null);
     const [showDebugDialog, setShowDebugDialog] = useState(false);
+
+    // NEW CONTROLS STATE
+    const [autoRotate, setAutoRotate] = useState(false);
+    const [rotationSpeed, setRotationSpeed] = useState(0.01);
+
+    // REFS FOR ANIMATION LOOP (Avoid stale closures)
+    const autoRotateRef = useRef(false);
+    const rotationSpeedRef = useRef(0.01);
+    const modelRef = useRef(null); // Sync with modelObject
+
+    // Sync Refs
+    useEffect(() => { autoRotateRef.current = autoRotate; }, [autoRotate]);
+    useEffect(() => { rotationSpeedRef.current = rotationSpeed; }, [rotationSpeed]);
+    useEffect(() => { modelRef.current = modelObject; }, [modelObject]);
 
     // Initial Load
     // 2) refetch único (User Request Pattern)
@@ -595,6 +609,18 @@ function Converter() {
         let animationId;
         const animate = () => {
             animationId = requestAnimationFrame(animate);
+
+            // AUTO ROTATION LOGIC
+            if (autoRotateRef.current && modelRef.current) {
+                modelRef.current.rotation.y += rotationSpeedRef.current;
+                // Sync React state if needed? No, purely visual loop.
+                // But we might want to update the slider if it's dragging? 
+                // Let's just update the visual object. 
+                // To keep slider in sync would require state update which lags.
+                // detailed sync is complex, let's stick to visual rotate.
+                // NOTE: If user touches slider, it overrides this momentarily via prop update.
+            }
+
             controls.update();
             renderer.render(scene, camera);
         };
@@ -638,16 +664,29 @@ function Converter() {
         // Apply Position (Height)
         modelObject.position.y = verticalPos;
 
-        // Apply Color (Traverse)
-        if (isRxMode && color) {
+        // Apply RX Mode (Neon Wireframe)
+        if (modelObject) {
             modelObject.traverse((child) => {
                 if (child.isMesh) {
-                    // Clone material to avoid affecting shared resources
-                    if (!child.userData.originalMaterial) child.userData.originalMaterial = child.material.clone();
+                    // Save Original
+                    if (!child.userData.originalMaterial) {
+                        child.userData.originalMaterial = Array.isArray(child.material)
+                            ? child.material.map(m => m.clone())
+                            : child.material.clone();
+                    }
 
-                    const newMat = child.userData.originalMaterial.clone();
-                    newMat.color.set(color);
-                    child.material = newMat;
+                    if (isRxMode) {
+                        // NEON BLUE WIREFRAME
+                        child.material = new THREE.MeshBasicMaterial({
+                            color: 0x00FFFF, // Cyan / Electrical Blue
+                            wireframe: true,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                    } else {
+                        // Restore Original
+                        child.material = child.userData.originalMaterial;
+                    }
                 }
             });
         }
@@ -791,58 +830,87 @@ function Converter() {
                         </div>
                     )}
 
-                    {/* CONTROL BAR (MOBILE OPTIMIZED) */}
+                    {/* FUTURISTIC CONTROL DECK */}
                     {modelObject && (
-                        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-[#151B23]/90 border border-white/10 p-3 rounded-lg backdrop-blur-md flex items-center gap-4 shadow-xl z-10 w-[95%] max-w-2xl justify-around overflow-x-auto no-scrollbar">
+                        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 
+                                      bg-black/60 backdrop-blur-xl border border-white/10 
+                                      p-4 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] 
+                                      flex items-center gap-6 z-20 w-[95%] max-w-3xl 
+                                      justify-between overflow-x-auto no-scrollbar">
 
-                            {/* Rotation */}
-                            <div className="flex flex-col items-center gap-1 min-w-[80px] w-full max-w-[120px]">
-                                <span className="text-[9px] text-gray-400 font-mono uppercase">Rotación</span>
-                                <Slider
-                                    value={[rotation]}
-                                    min={0} max={6.28} step={0.1}
-                                    onValueChange={([v]) => setRotation(v)}
-                                    className="w-full"
-                                />
-                            </div>
-
-                            {/* Height */}
-                            <div className="flex flex-col items-center gap-1 min-w-[80px] w-full max-w-[120px]">
-                                <span className="text-[9px] text-gray-400 font-mono uppercase">Altura</span>
-                                <Slider
-                                    value={[verticalPos]}
-                                    min={-5} max={5} step={0.1}
-                                    onValueChange={([v]) => setVerticalPos(v)}
-                                    className="w-full"
-                                />
-                            </div>
-
-                            {/* Version Display */}
-                            <div className="bg-[#151B23] px-3 py-1.5 rounded border border-[#1E293B]">
-                                <span className="text-[#29B6F6] text-xs font-bold">v3.16.0</span>
-                                <span className="text-gray-500 text-[10px] ml-2 font-mono">(MOBILE-REV)</span>
-                            </div>
-
-                            {/* Color Toggle */}
-                            <div className="flex flex-col items-center gap-1 shrink-0">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[9px] text-gray-400 font-mono uppercase">Pintura</span>
-                                    <Switch checked={isRxMode} onCheckedChange={setIsRxMode} />
-                                </div>
-                                {isRxMode && (
-                                    <input
-                                        type="color"
-                                        value={color}
-                                        onChange={(e) => setColor(e.target.value)}
-                                        className="w-8 h-6 bg-transparent cursor-pointer"
+                            {/* GROUP 1: TRANSFORM */}
+                            <div className="flex items-center gap-4 border-r border-white/10 pr-4 shrink-0">
+                                {/* Rotation Manual */}
+                                <div className="flex flex-col gap-1 w-24">
+                                    <div className="flex justify-between items-center text-[10px] text-cyan-400 font-mono tracking-wider">
+                                        <span className="flex items-center gap-1"><RotateCw size={10} /> Y-AXIS</span>
+                                        <span>{Math.round(rotation * (180 / Math.PI))}°</span>
+                                    </div>
+                                    <Slider
+                                        value={[rotation]}
+                                        min={0} max={6.28} step={0.1}
+                                        onValueChange={([v]) => setRotation(v)}
+                                        className="w-full"
                                     />
-                                )}
+                                </div>
+
+                                {/* Height */}
+                                <div className="flex flex-col gap-1 w-24">
+                                    <div className="flex justify-between items-center text-[10px] text-cyan-400 font-mono tracking-wider">
+                                        <span className="flex items-center gap-1"><MoveVertical size={10} /> ALTITUDE</span>
+                                        <span>{verticalPos.toFixed(1)}</span>
+                                    </div>
+                                    <Slider
+                                        value={[verticalPos]}
+                                        min={-5} max={5} step={0.1}
+                                        onValueChange={([v]) => setVerticalPos(v)}
+                                        className="w-full"
+                                    />
+                                </div>
                             </div>
 
-                            {/* Reset */}
-                            <Button variant="ghost" size="icon" onClick={resetCamera} title="Reset Camera" className="shrink-0">
-                                <RefreshCw className="h-4 w-4" />
-                            </Button>
+                            {/* GROUP 2: AUTO-ROTATION */}
+                            <div className="flex items-center gap-3 border-r border-white/10 pr-4 shrink-0">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={`h-8 w-8 rounded-full ${autoRotate ? 'bg-cyan-500/20 text-cyan-400 animate-pulse' : 'text-gray-400 hover:text-white'}`}
+                                    onClick={() => setAutoRotate(!autoRotate)}
+                                    title="Auto-Rotate"
+                                >
+                                    {autoRotate ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+                                </Button>
+
+                                <div className="flex flex-col gap-1 w-20">
+                                    <span className="text-[9px] text-gray-400 font-mono uppercase text-center">RPM</span>
+                                    <Slider
+                                        value={[rotationSpeed * 100]} // Scale for UI
+                                        min={-5} max={5} step={0.5}
+                                        onValueChange={([v]) => setRotationSpeed(v / 100)} // Unscale
+                                        className="w-full"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* GROUP 3: SYSTEM/RX */}
+                            <div className="flex items-center gap-4 shrink-0">
+                                <div className={`flex items-center gap-3 px-3 py-1.5 rounded-lg border transition-all duration-300 ${isRxMode ? 'bg-cyan-950/30 border-cyan-500/50 shadow-[0_0_15px_rgba(34,211,238,0.2)]' : 'border-white/5 bg-white/5'}`}>
+                                    <div className="flex flex-col">
+                                        <span className={`text-[9px] font-bold font-mono ${isRxMode ? 'text-cyan-400' : 'text-gray-400'}`}>RX-MODE</span>
+                                        <span className="text-[8px] text-gray-500">WIREFRAME</span>
+                                    </div>
+                                    <Switch
+                                        checked={isRxMode}
+                                        onCheckedChange={setIsRxMode}
+                                        className="data-[state=checked]:bg-cyan-500"
+                                    />
+                                    <Activity size={14} className={isRxMode ? "text-cyan-400 animate-pulse" : "text-gray-600"} />
+                                </div>
+
+                                <Button variant="ghost" size="icon" onClick={resetCamera} title="Reset Systems" className="text-gray-400 hover:text-white hover:bg-white/10 rounded-full h-8 w-8">
+                                    <RefreshCw className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </div>
