@@ -186,7 +186,6 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser, na
       name: name || fileName, // PREFER USER NAME
       file_path: `${bucket}:${path}`,
       file_url: publicUrl, // ESSENTIAL for the viewer
-      file_name: fileName,
       mime_type: file.type || 'application/octet-stream',
       size: file.size || null
     };

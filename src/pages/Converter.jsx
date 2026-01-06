@@ -102,7 +102,7 @@ function Converter() {
 
             const { data, error } = await supabase
                 .from("models")
-                .select("id,name,file_name,created_at,file_path,project_id,user_id")
+                .select("id,name,created_at,file_path,project_id,user_id")
                 .eq("user_id", currentUser.id)
                 .order("created_at", { ascending: false });
 
@@ -882,8 +882,8 @@ function Converter() {
                                 userModels.map(m => (
                                     <div key={m.id} className="p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer group" onClick={() => { handleLoadModel(m); if (window.innerWidth < 640) setShowLibrary(false); }}>
                                         <div className="flex justify-between items-center">
-                                            <p className="font-medium truncate max-w-[150px] text-sm" title={m.name || m.file_name}>
-                                                {m.name || m.file_name}
+                                            <p className="font-medium truncate max-w-[150px] text-sm" title={m.name || m.file_path?.split('/').pop()}>
+                                                {m.name || m.file_path?.split('/').pop()}
                                             </p>
                                             <div
                                                 className="p-1 hover:bg-white/20 rounded cursor-pointer"
