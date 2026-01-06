@@ -58,44 +58,41 @@ export async function listProjects(authUser = null) {
   return data ?? [];
 }
 
-// CREATE PROJECT (Reverted to Standard Insert with Logging)
+// CREATE PROJECT (RPC Strategy - Security Definer)
 export async function createProject(projectData, authUser = null) {
   try {
-    console.log("STEP 2a: createProject started");
+    console.log("STEP 2a: createProject started (RPC Mode)");
     const user = await requireUser(authUser);
 
-    console.log("STEP 2b: User ID confirmed:", user.id);
-
     const payload = {
-      name: projectData.name,
-      description: projectData.description,
-      user_id: user.id,
-      status: 'pending',
-      created_at: new Date().toISOString()
+      p_name: projectData.name,
+      p_description: projectData.description,
+      p_user_id: user.id
     };
 
-    console.log("STEP 2c: Inserting project payload:", payload);
+    console.log("STEP 2b: Calling RPC create_project_safe...");
 
-    // STANDARD INSERT (No RPC)
-    const promise = supabase
-      .from('projects')
-      .insert(payload)
-      .select()
-      .single();
-
-    // 10s Explicit Timeout
-    const { data, error } = await withTimeout(promise, 10000, 'projects.insert');
+    // RPC Request - Bypasses Client RLS
+    const { data, error } = await withTimeout(
+      supabase.rpc('create_project_safe', payload),
+      15000,
+      'rpc.create_project_safe'
+    );
 
     if (error) {
-      console.error("STEP 2d: Project Insert Error:", error);
+      console.error("STEP 2c: RPC Failed:", error);
       throw error;
     }
 
-    console.log("STEP 2e: Project created successfully:", data);
-    return data;
+    // Normalize RPC response (it returns the object directly or inside data)
+    // If returning jsonb, it might be data object itself
+    const project = data;
+
+    console.log("STEP 2d: Project created via RPC:", project);
+    return project;
   } catch (err) {
-    console.error("STEP 2f: Fatal Project Error:", err);
-    throw new Error(`Error creando proyecto: ${err.message}`);
+    console.error("STEP 2e: Fatal Project Error:", err);
+    throw new Error(`Error creando proyecto (RPC): ${err.message}`);
   }
 }
 
@@ -126,6 +123,8 @@ function safeName(name = 'file') {
 
 export async function uploadModelToCloud({ file, projectId, onStep, authUser }) {
   if (!file) throw new Error('No se recibió archivo.');
+  if (!projectId) throw new Error('Project ID missing for upload.');
+
   console.log("STEP 4: uploadModelToCloud started");
 
   const user = await requireUser(authUser);
@@ -153,7 +152,7 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser }) 
         contentType: file.type || undefined
       });
 
-    const { data, error } = await withTimeout(uploadPromise, 10000, 'storage.upload');
+    const { data, error } = await withTimeout(uploadPromise, 20000, 'storage.upload');
     if (error) throw error;
     console.log("STEP 6c: Upload successful:", data);
     return data;
@@ -202,25 +201,29 @@ export async function saveModelFlow({ file, selectedProjectId, onStep, authUser 
 
   // Ensure user exists
   console.log("STEP 1b: checking user...");
-  await requireUser(authUser);
-  console.log("STEP 1c: user confirmed");
+  const user = await requireUser(authUser);
+  console.log("STEP 1c: user confirmed", user.id);
 
-  // Ensure project exists
+  // STRATEGY: Default Project / Reuse
   if (!projectId) {
     try {
-      console.log("STEP 2: Creating new project...");
-      const project = await createProject({ name: 'Nuevo Proyecto', description: 'Proyecto creado automáticamente' }, authUser);
-      projectId = project.id;
-      console.log("STEP 2: Project created, ID:", projectId);
+      console.log("STEP 2: Searching for existing project...");
+      const existingProjects = await listProjects(user);
+
+      if (existingProjects && existingProjects.length > 0) {
+        projectId = existingProjects[0].id;
+        console.log("STEP 2: Found existing project. Reusing:", projectId);
+      } else {
+        console.log("STEP 2: No existing projects found. Creating new via RPC...");
+        const project = await createProject({ name: 'Nuevo Proyecto', description: 'Proyecto creado automáticamente' }, user);
+        projectId = project.id;
+      }
     } catch (err) {
-      console.error("STEP 2 Error: Project creation failed (Timeout/Block).", err);
-      // BYPASS STRATEGY: Proceed to upload test anyway
-      projectId = crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-0000-0000-000000000000';
-      console.warn(`STEP 2: SKIPPING PROJECT STOPPER. Using Fake ID: ${projectId} to test STORAGE.`);
-      toast && toast({ title: "Modo Diagnóstico", description: "Saltando creación de proyecto para probar subida...", variant: "warning" });
+      console.error("STEP 2 Error: Default Project Strategy Failed.", err);
+      throw err;
     }
   } else {
-    console.log("STEP 2: Using existing project:", projectId);
+    console.log("STEP 2: Using provided project:", projectId);
   }
 
   try {
@@ -231,7 +234,7 @@ export async function saveModelFlow({ file, selectedProjectId, onStep, authUser 
   } catch (e) {
     console.error("Workflow Failed:", e);
     // Only mark project error if it's a real project
-    if (projectId && projectId.length > 10) {
+    if (projectId) {
       await markProjectError(projectId, e?.message || e);
     }
     throw e;
