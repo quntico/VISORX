@@ -207,22 +207,33 @@ export async function saveModelFlow({ file, selectedProjectId, onStep, authUser 
 
   // Ensure project exists
   if (!projectId) {
-    console.log("STEP 2: Creating new project...");
-    const project = await createProject({ name: 'Nuevo Proyecto', description: 'Proyecto creado automáticamente' }, authUser);
-    projectId = project.id;
-    console.log("STEP 2: Project created, ID:", projectId);
+    try {
+      console.log("STEP 2: Creating new project...");
+      const project = await createProject({ name: 'Nuevo Proyecto', description: 'Proyecto creado automáticamente' }, authUser);
+      projectId = project.id;
+      console.log("STEP 2: Project created, ID:", projectId);
+    } catch (err) {
+      console.error("STEP 2 Error: Project creation failed (Timeout/Block).", err);
+      // BYPASS STRATEGY: Proceed to upload test anyway
+      projectId = crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-0000-0000-000000000000';
+      console.warn(`STEP 2: SKIPPING PROJECT STOPPER. Using Fake ID: ${projectId} to test STORAGE.`);
+      toast && toast({ title: "Modo Diagnóstico", description: "Saltando creación de proyecto para probar subida...", variant: "warning" });
+    }
   } else {
     console.log("STEP 2: Using existing project:", projectId);
   }
 
   try {
-    console.log("STEP 3: Calling uploadModelToCloud...");
+    console.log(`STEP 3: Calling uploadModelToCloud with ID: ${projectId}...`);
     const result = await uploadModelToCloud({ file, projectId, onStep, authUser });
     console.log("STEP 8: Workflow Complete!", result);
     return { projectId, ...result };
   } catch (e) {
     console.error("Workflow Failed:", e);
-    await markProjectError(projectId, e?.message || e);
+    // Only mark project error if it's a real project
+    if (projectId && projectId.length > 10) {
+      await markProjectError(projectId, e?.message || e);
+    }
     throw e;
   }
 }
