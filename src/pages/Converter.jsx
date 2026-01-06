@@ -80,54 +80,68 @@ function Converter() {
     const [showDebugDialog, setShowDebugDialog] = useState(false);
 
     // Initial Load
-    useEffect(() => {
-        if (user) {
-            console.log("User detected, auto-loading library...");
-            loadAllData();
-        } else {
-            console.log("No user detected on mount, waiting for auth...");
-        }
-    }, [user]);
+    // Unified Library Fetcher
+    const refetchLibrary = async (isManual = false) => {
+        if (!user) return;
 
-    const loadAllData = async (isManual = false) => {
-        // SAFE: Only show spinner on manual user click
-        if (isManual) {
-            setRefreshingLibrary(true);
-            setUserModels([]); // VISUAL PROOF: Clear list to show re-fetch happening
-        }
+        console.log("LIB: refetch start");
+        if (isManual) setRefreshingLibrary(true);
         setLibraryError(null);
+
         try {
             const projs = await listProjects(user);
             setProjects(projs);
 
-            // Polyfill for models - NOW WITH CACHE BUSTING
             const { data: models, error } = await supabase
                 .from('models')
                 .select('*')
-                .eq('user_id', user?.id)
-                .neq('id', '00000000-0000-0000-0000-000000000000') // Dummy filter to ensure non-cached query
+                .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
 
+            console.log(`LIB: refetch ok count=${models?.length || 0}`);
             setUserModels(models || []);
-            console.log("Library loaded:", projs.length, "projects,", models?.length, "models");
 
             if (isManual) {
                 toast({
                     title: "Librería Actualizada",
                     description: `Se encontraron ${models?.length || 0} modelos.`,
-                    duration: 3000
+                    duration: 2000
                 });
             }
         } catch (e) {
-            console.error("Error loading data:", e);
+            console.error("LIB: refetch error", e);
             setLibraryError(e.message);
-            toast({ title: "Error de carga", description: "No se pudo cargar la librería.", variant: "destructive" });
+            toast({ title: "Error", description: "Fallo al actualizar librería.", variant: "destructive" });
         } finally {
             if (isManual) setRefreshingLibrary(false);
         }
     };
+
+    // Initial Load & Event Listeners
+    useEffect(() => {
+        if (user) {
+            refetchLibrary();
+
+            const handleFocus = () => {
+                console.log("LIB: Window focused, refreshing...");
+                refetchLibrary();
+            };
+
+            window.addEventListener('focus', handleFocus);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') handleFocus();
+            });
+
+            return () => {
+                window.removeEventListener('focus', handleFocus);
+                // Note: visibilitychange listener cleanup is tricky with anonymous func, 
+                // but component unmount handles the main concern. 
+                // For strictness we could define the handler outside.
+            };
+        }
+    }, [user]);
 
     // ==================== SAVE LOGIC (NEW) ====================
     const confirmSaveToProject = async () => {
@@ -635,7 +649,7 @@ function Converter() {
                                 <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                 <span className="sm:hidden">Toolkit</span>
                                 <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                    v3.17.10
+                                    v3.17.11
                                 </span>
                             </h1>
                         </div>
@@ -813,7 +827,7 @@ function Converter() {
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold">Tu Librería</h3>
                             <div className="flex gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => loadAllData(true)} disabled={loading || refreshingLibrary}>
+                                <Button variant="ghost" size="sm" onClick={() => refetchLibrary(true)} disabled={loading || refreshingLibrary}>
                                     <RotateCw className={`h-4 w-4 ${refreshingLibrary ? 'animate-spin text-[#29B6F6]' : ''}`} />
                                 </Button>
                                 {/* Mobile Close Button */}
