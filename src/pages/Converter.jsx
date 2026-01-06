@@ -25,6 +25,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js'; // Added MTL Support
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'; // Added STL Support
 import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -328,6 +329,9 @@ function Converter() {
                     const zip = new JSZip();
                     const contents = await zip.loadAsync(f);
                     for (const filename of Object.keys(contents.files)) {
+                        // Filter Junk Files
+                        if (filename.includes("__MACOSX") || filename.includes(".DS_Store")) continue;
+
                         if (!contents.files[filename].dir) {
                             const blob = await contents.files[filename].async('blob');
                             extracted.push(new File([blob], filename.split('/').pop(), { type: blob.type }));
@@ -394,7 +398,21 @@ function Converter() {
         try {
             if (ext === 'glb' || ext === 'gltf') new GLTFLoader(manager).load(url, onLoad, undefined, onError);
             else if (ext === 'fbx') new FBXLoader(manager).load(url, onLoad, undefined, onError);
-            else if (ext === 'obj') new OBJLoader(manager).load(url, onLoad, undefined, onError);
+            else if (ext === 'obj') {
+                // Check for MTL
+                const mtlFile = allFiles.find(f => f.name.toLowerCase().endsWith('.mtl'));
+                if (mtlFile) {
+                    const mtlUrl = URL.createObjectURL(mtlFile);
+                    new MTLLoader(manager).load(mtlUrl, (materials) => {
+                        materials.preload();
+                        new OBJLoader(manager)
+                            .setMaterials(materials)
+                            .load(url, onLoad, undefined, onError);
+                    }, undefined, onError);
+                } else {
+                    new OBJLoader(manager).load(url, onLoad, undefined, onError);
+                }
+            }
             else if (ext === 'stl') new STLLoader(manager).load(url, (geo) => {
                 // STL returns Geometry, not Object3D
                 const material = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
