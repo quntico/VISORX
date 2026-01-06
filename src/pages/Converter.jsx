@@ -73,6 +73,7 @@ function Converter() {
     const [helpContent, setHelpContent] = useState(null);
 
     const [libraryError, setLibraryError] = useState(null);
+    const [loadError, setLoadError] = useState(null); // NEW: Track load errors
     const [showDebugDialog, setShowDebugDialog] = useState(false);
 
     // Initial Load
@@ -86,6 +87,12 @@ function Converter() {
     }, [user]);
 
     const loadAllData = async () => {
+
+        // ... (keep existing loadAllData, listProjects, etc. - skipping for brevity if not modifying) ...
+        // BUT replace_file_content doesn't like skipping if I target a block. 
+        // I will use multiple ReplaceFileContent calls or target specific areas.
+        // I will target the stated variables first.
+
         setLibraryError(null);
         try {
             const projs = await listProjects(user);
@@ -372,8 +379,15 @@ function Converter() {
 
         const onError = (err) => {
             console.error(err);
-            alert(`ERROR DE CARGA THREE.JS: ${err.message || "Fallo desconocido al parsear modelo"}`);
+            // alert(`ERROR DE CARGA THREE.JS: ${err.message || "Fallo desconocido al parsear modelo"}`);
+            setLoadError(err.message || "Error desconocido al procesar el archivo 3D.");
             setLoading(false);
+
+            toast({
+                title: "Error de Visualización",
+                description: "El modelo no se pudo renderizar, pero aún puedes guardarlo.",
+                variant: "destructive"
+            });
         };
 
         try {
@@ -383,10 +397,10 @@ function Converter() {
             else if (ext === 'dae') new ColladaLoader(manager).load(url, onLoad, undefined, onError);
             else {
                 setLoading(false);
-                alert("Formato no soportado por el Load Manager");
+                setLoadError("Formato no soportado por el visualizador web.");
             }
         } catch (e) {
-            alert(`EXCEPCIÓN AL INICIAR LOADER: ${e.message}`);
+            setLoadError(`Error Crítico: ${e.message}`);
             setLoading(false);
         }
     };
@@ -628,7 +642,7 @@ function Converter() {
                     >
                         <BoxIcon className="h-4 w-4 mr-2" /> AR / Proyectar
                     </Button>
-                    <Button size="sm" onClick={() => setShowSaveDialog(true)} disabled={!modelObject} className="whitespace-nowrap">
+                    <Button size="sm" onClick={() => setShowSaveDialog(true)} disabled={!modelObject && !modelFile} className="whitespace-nowrap">
                         <Save className="h-4 w-4 mr-2" /> Guardar
                     </Button>
                 </div>
@@ -652,9 +666,29 @@ function Converter() {
                     <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
 
                     {/* React Overlay - Empty State */}
-                    {!modelObject && (
+                    {!modelObject && !loadError && (
                         <div className="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none p-4 text-center">
                             <p>Arrastra un archivo aquí o usa "Subir ZIP"</p>
+                        </div>
+                    )}
+
+                    {/* React Overlay - ERROR STATE */}
+                    {loadError && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-6 text-center z-10">
+                            <AlertCircle className="h-16 w-16 text-yellow-500 mb-4" />
+                            <h3 className="text-xl font-bold mb-2">No se pudo previsualizar</h3>
+                            <p className="text-gray-400 mb-6 max-w-md">
+                                {loadError.includes("version") ? "El archivo tiene una versión antigua incompatible con el visor web, pero es válido." : loadError}
+                            </p>
+                            <div className="flex gap-4">
+                                <Button variant="outline" onClick={() => { setLoadError(null); setModelFile(null); }}>
+                                    Cancelar
+                                </Button>
+                                <Button onClick={() => setShowSaveDialog(true)} className="bg-green-600 hover:bg-green-700">
+                                    <Upload className="h-4 w-4 mr-2" />
+                                    Subir de todas formas
+                                </Button>
+                            </div>
                         </div>
                     )}
 
