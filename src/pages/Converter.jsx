@@ -25,6 +25,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'; // Added STL Support
 import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js'; // For iOS AR
@@ -337,11 +338,11 @@ function Converter() {
                 }
             }
 
-            const main = extracted.find(f => f.name.match(/\.(gltf|glb|obj|fbx|dae)$/i));
+            const main = extracted.find(f => f.name.match(/\.(gltf|glb|obj|fbx|dae|stl)$/i));
             if (main) {
                 loadModelFile(main, extracted);
             } else {
-                toast({ title: "Error", description: "No se encontró archivo compatible (.glb, .obj, .fbx, .dae).", variant: "destructive" });
+                toast({ title: "Error", description: "No se encontró archivo compatible (.glb, .obj, .fbx, .dae, .stl).", variant: "destructive" });
                 setLoading(false);
             }
         } catch (e) {
@@ -394,6 +395,12 @@ function Converter() {
             if (ext === 'glb' || ext === 'gltf') new GLTFLoader(manager).load(url, onLoad, undefined, onError);
             else if (ext === 'fbx') new FBXLoader(manager).load(url, onLoad, undefined, onError);
             else if (ext === 'obj') new OBJLoader(manager).load(url, onLoad, undefined, onError);
+            else if (ext === 'stl') new STLLoader(manager).load(url, (geo) => {
+                // STL returns Geometry, not Object3D
+                const material = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+                const mesh = new THREE.Mesh(geo, material);
+                onLoad(mesh);
+            }, undefined, onError);
             else if (ext === 'dae') new ColladaLoader(manager).load(url, onLoad, undefined, onError);
             else {
                 setLoading(false);
@@ -667,8 +674,13 @@ function Converter() {
 
                     {/* React Overlay - Empty State */}
                     {!modelObject && !loadError && (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none p-4 text-center">
-                            <p>Arrastra un archivo aquí o usa "Subir ZIP"</p>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 pointer-events-none p-4 text-center">
+                            <p className="mb-2">Arrastra un archivo aquí o usa "Subir ZIP"</p>
+                            <p className="text-xs text-gray-600 max-w-xs">
+                                Soporta: .GLB, .FBX, .OBJ, .STL, .DAE
+                                <br />
+                                <span className="text-[#29B6F6]">Para texturas en FBX/OBJ: Sube un .ZIP con el modelo y las imágenes.</span>
+                            </p>
                         </div>
                     )}
 
