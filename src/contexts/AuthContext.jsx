@@ -54,119 +54,110 @@ export function AuthProvider({ children }) {
     if (!supabase) { setLoading(false); return; }
 
     const initAuth = async () => {
-      logAuth('Init: v5.0 - Hash Protection');
+      logAuth('Init: v5.1 - Aggressive Hash Hijack');
 
-      // Check for OAuth Hash/Code
-      const hasHash = window.location.hash.includes('access_token') ||
-        window.location.search.includes('code=');
+      // 1. Check for OAuth Hash/Code
+      const hash = window.location.hash;
+      const search = window.location.search;
+      const hasHash = hash.includes('access_token') || search.includes('code=');
 
+      // 2. Race getSession against a 4s timeout
+      let initialSession = null;
       try {
-        // Race getSession against a 4s timeout to prevent infinite loading
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Auth Timeout")), 4000)
         );
+        const { data } = await Promise.race([sessionPromise, timeoutPromise]);
+        initialSession = data.session;
+      } catch (e) {
+        logAuth(`SDK Init Error: ${e.message}`);
+      }
 
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+      // 3. Evaluate Session or Force Hijack
+      if (initialSession?.user) {
+        logAuth(`Session Found via SDK: ${initialSession.user.email}`);
+        setUser(initialSession.user);
+        await fetchProfile(initialSession.user);
 
-        if (session?.user) {
-          logAuth(`Session Found: ${session.user.email}`);
-          setUser(session.user);
-          await fetchProfile(session.user);
+        if (hasHash) window.history.replaceState(null, '', window.location.pathname);
+        if (window.location.pathname === '/login') window.location.replace('/dashboard');
+        setLoading(false);
+      } else {
+        // NO SDK SESSION - CHECK FOR MANUAL HIJACK
+        logAuth('SDK returned null session.');
 
-          // Clear hash safely
-          if (hasHash) {
-            window.history.replaceState(null, '', window.location.pathname);
-          }
+        if (hasHash) {
+          logAuth('OAuth Hash Detected! Engaging Manual Hijack...');
 
-          // Redirect if on login
-          if (window.location.pathname === '/login') {
-            window.location.replace('/dashboard');
-          }
+          const params = new URLSearchParams(hash.replace('#', ''));
+          const searchParams = new URLSearchParams(search);
 
-          // Safe to stop loading
-          setLoading(false);
-        } else {
-          // NO SESSION FOUND
-          logAuth('No active session.');
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+          const code = searchParams.get('code');
 
-          if (hasHash) {
-            logAuth('OAuth detected! Attempting manual extraction...');
+          if (access_token) {
+            logAuth('Manual Token Found. Setting Session...');
+            const { data, error } = await supabase.auth.setSession({
+              access_token,
+              refresh_token: refresh_token || ''
+            });
 
-            // MANUAL HASH (IMPLICIT) OR CODE (PKCE) PARSING
-            const hash = window.location.hash;
-            const search = window.location.search;
-            const params = new URLSearchParams(hash.replace('#', ''));
-            const searchParams = new URLSearchParams(search);
-
-            const access_token = params.get('access_token');
-            const refresh_token = params.get('refresh_token');
-            const code = searchParams.get('code');
-
-            if (access_token) {
-              logAuth('Manual Token Found. Forcing Session...');
-              const { data, error } = await supabase.auth.setSession({
-                access_token,
-                refresh_token: refresh_token || '' // Allow missing refresh token
-              });
-
-              if (!error && (data.session || data.user)) {
-                logAuth('Manual Session Set Success!');
-                setUser(data.user || data.session.user);
-                await fetchProfile(data.user || data.session.user);
-                window.history.replaceState(null, '', window.location.pathname); // Clear hash
-                setLoading(false);
-                return; // Done
-              } else {
-                console.error("Manual SetSession Failed:", error);
-                // Fallback: Try getUser directly with token
-                const { data: userData, error: userError } = await supabase.auth.getUser(access_token);
-                if (userData?.user) {
-                  logAuth('Recovered User via Token!');
-                  setUser(userData.user);
-                  await fetchProfile(userData.user);
-                  setLoading(false);
-                  return;
-                }
-              }
-            } else if (code) {
-              logAuth('Manual Code (PKCE) Found. Exchanging...');
-              const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-
-              if (!error && data.session) {
-                logAuth('Manual Code Exchange Success!');
-                setUser(data.session.user);
-                await fetchProfile(data.session.user);
+            if (!error && (data.session || data.user)) {
+              logAuth('Manual Session Set Success!');
+              setUser(data.user || data.session.user);
+              await fetchProfile(data.user || data.session.user);
+              window.history.replaceState(null, '', window.location.pathname);
+              setLoading(false);
+              return;
+            } else {
+              logAuth(`Manual SetSession Failed: ${error?.message}`);
+              // Fallback: Direct User Fetch
+              const { data: userData } = await supabase.auth.getUser(access_token);
+              if (userData?.user) {
+                logAuth('Recovered User via Token (getUser)!');
+                setUser(userData.user);
+                await fetchProfile(userData.user);
                 window.history.replaceState(null, '', window.location.pathname);
                 setLoading(false);
                 return;
-              } else {
-                logAuth(`Code Exchange Failed: ${error?.message}`);
               }
             }
-
-            // Fallback: Wait for event if manual parsing failed (or if it was a 'code=' flow)
-            setTimeout(() => {
-              logAuth('Hash Wait Timeout. Forcing load finish.');
-              setLoading((prev) => {
-                if (prev) return false;
-                return prev;
-              });
-            }, 6000);
-          } else {
-            // Check local storage fallbacks (Dev User)
-            const storedUser = localStorage.getItem('visorx_user');
-            if (storedUser && (storedUser.includes('dev_user') || storedUser.includes('sim_user'))) {
-              const parsed = JSON.parse(storedUser);
-              setUser(parsed);
-              setRole(parsed.role || 'user');
+          } else if (code) {
+            // PKCE Code Exchange
+            logAuth('PKCE Code Found. Exchanging...');
+            const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+            if (!error && data.session) {
+              logAuth('PKCE Exchange Success!');
+              setUser(data.session.user);
+              await fetchProfile(data.session.user);
+              window.history.replaceState(null, '', window.location.pathname);
+              setLoading(false);
+              return;
             }
-            setLoading(false);
           }
+
+          // If we are here, manual hijack failed.
+          logAuth('Manual Hijack Failed. Waiting up to 6s for events...');
+          setTimeout(() => {
+            setLoading((prev) => {
+              if (prev) {
+                logAuth('Safety Timeout: Unlocking UI (Offline).');
+                return false;
+              }
+              return prev;
+            });
+          }, 6000);
+
+        } else {
+          // No Hash, No Session -> Check Local Fallbacks
+          const storedUser = localStorage.getItem('visorx_user');
+          if (storedUser && (storedUser.includes('dev_user'))) {
+            setUser(JSON.parse(storedUser));
+          }
+          setLoading(false);
         }
-      } catch (e) {
-        logAuth(`Init Error: ${e.message}`);
-        setLoading(false);
       }
     };
 
