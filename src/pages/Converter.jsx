@@ -801,6 +801,38 @@ function Converter() {
         }
     }, [rotation, verticalPos, color, modelObject, isRxMode]);
 
+    // CAPTURE FUNCTIONS
+    const handleScreenshot = () => {
+        if (!rendererRef.current) return;
+        const link = document.createElement('a');
+        link.download = `screenshot-${Date.now()}.png`;
+        link.href = rendererRef.current.domElement.toDataURL('image/png');
+        link.click();
+    };
+
+    const handleRecord = () => {
+        if (isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        } else {
+            const stream = rendererRef.current.domElement.captureStream(30);
+            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            recorder.ondataavailable = e => chunksRef.current.push(e.data);
+            recorder.onstop = () => {
+                const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `capture-${Date.now()}.webm`;
+                a.click();
+                chunksRef.current = [];
+            };
+            recorder.start();
+            mediaRecorderRef.current = recorder;
+            setIsRecording(true);
+        }
+    };
+
     const resetCamera = () => {
         if (controlsRef.current) controlsRef.current.reset();
         setRotation(0);
