@@ -691,9 +691,28 @@ function Converter() {
                     <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
 
                     {/* React Overlay - Empty State */}
-                    {!modelObject && !loadError && (
+                    {!modelObject && !loadError && !loading && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 pointer-events-none p-4 text-center">
                             <p className="text-sm">Arrastra tu archivo o ZIP aquí</p>
+                        </div>
+                    )}
+
+                    {/* React Overlay - LOADING / STATUS */}
+                    {loading && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-50 text-white backdrop-blur-sm transition-all duration-300">
+                            <Loader2 className="h-12 w-12 animate-spin text-[#29B6F6] mb-4" />
+                            <p className="font-mono text-lg font-bold tracking-wider">{uploadStatus || "Procesando..."}</p>
+                            {progress > 0 && (
+                                <div className="mt-4 w-64">
+                                    <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-[#29B6F6] transition-all duration-300 ease-out"
+                                            style={{ width: `${progress}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-center text-gray-400 mt-2 font-mono">{progress}%</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
