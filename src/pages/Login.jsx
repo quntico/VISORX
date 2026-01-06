@@ -113,7 +113,7 @@ function Login() {
               </div>
               <div className="ml-3">
                 <h1 className="text-2xl font-bold text-white">VISOR-X</h1>
-                <p className="text-xs text-[#29B6F6]">v3.14.1-ARFix</p>
+                <p className="text-xs text-[#29B6F6]">v3.15-Mobile</p>
               </div>
             </div>
 

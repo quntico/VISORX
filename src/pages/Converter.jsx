@@ -564,369 +564,277 @@ function Converter() {
     return (
         <div className="min-h-screen bg-[#0B0F14] text-white flex flex-col h-screen overflow-hidden">
 
-            {/* DEBUG CONSOLE (Fixed Visibility) */}
-            <div className="fixed top-24 right-4 z-[99999] bg-zinc-950 border-2 border-red-500 p-4 rounded-lg shadow-2xl text-xs font-mono text-white w-72 backdrop-blur-sm">
-                <h3 className="font-bold border-b border-red-500/30 pb-1 mb-2 text-red-400 flex justify-between items-center">
-                    <span>DEBUGGER v3.14.1</span>
-                    <span className={user ? "text-green-400" : "text-red-500"}>●</span>
-                </h3>
+            const [showDebugDialog, setShowDebugDialog] = useState(false);
 
-                <div className="bg-[#151B23] px-3 py-1.5 rounded border border-[#1E293B]">
-                    <span className="text-[#29B6F6] text-xs font-bold">v3.14.1</span>
-                    <span className="text-gray-500 text-[10px] ml-2 font-mono">(SECURE-AUTH)</span>
-                </div>
-                <div className="space-y-2 mb-4">
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">Status:</span>
-                        <span className={user ? "text-green-400" : "text-red-400"}>{loading ? "LOADING" : user ? "ONLINE" : "OFFLINE"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">User ID:</span>
-                        <span className="text-blue-300">{user?.id?.substring(0, 8) || 'NULL'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">Hash:</span>
-                        <span className="text-amber-300 break-all">{window.location.hash.substring(0, 10) || 'EMPTY'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">Params:</span>
-                        <span className="text-amber-300">{window.location.search || 'EMPTY'}</span>
-                    </div>
-                </div>
+            return (
+            <div className="min-h-screen bg-[#0B0F14] text-white flex flex-col h-screen overflow-hidden">
 
-                <div className="grid grid-cols-2 gap-2">
-                    <button
-                        onClick={() => supabase.auth.signInWithOAuth({
-                            provider: 'google',
-                            options: { redirectTo: window.location.origin + window.location.pathname }
-                        })}
-                        className="bg-red-900/50 hover:bg-red-700 border border-red-700 text-red-100 p-2 rounded transition-colors"
-                    >
-                        LOGIN
-                    </button>
-                    <button
-                        onClick={() => {
-                            const info = `
-                            URL: ${window.location.href}
-                            LS-Token: ${localStorage.getItem('sb-uufffrsgpdcocosfukjm-auth-token') ? 'FOUND' : 'MISSING'}
-                            Session: ${JSON.stringify(user || 'null')}
-                            `;
-                            alert(info);
-                        }}
-                        className="bg-blue-900/50 hover:bg-blue-700 border border-blue-700 text-blue-100 p-2 rounded transition-colors"
-                    >
-                        INSPECT
-                    </button>
-                </div>
-            </div>
-
-            {/* Header */}
-            <header className="border-b border-[#29B6F6]/20 bg-[#151B23] p-4 shrink-0">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
-                        <div className="flex flex-col">
-                            <h1 className="text-xl font-bold flex items-center gap-2">
-                                Toolkit & Convertidor
-                                <span className="bg-blue-900/50 text-blue-200 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 font-mono">
-                                    v3.14.1 (AR-FIX)
-                                </span>
-                            </h1>
-                        </div>
-
-                        {/* INDICATORS (New) */}
-                        <div
-                            className="flex items-center gap-3 px-4 py-1 bg-black/30 rounded-full border border-white/10 hover:bg-white/10 cursor-pointer transition-colors"
-                            onClick={() => {
-                                if (!user) {
-                                    // FORCE REDIRECT TO CURRENT PAGE (Avoids /dashboard logic mismatch)
-                                    supabase.auth.signInWithOAuth({
-                                        provider: 'google',
-                                        options: { redirectTo: window.location.origin + window.location.pathname }
-                                    });
-                                } else {
-                                    // Debug: Log session
-                                    console.log("Current Session:", user);
-                                    alert(`Session Info:\nID: ${user.id}\nEmail: ${user.email}`);
-                                }
-                            }}
-                            title={user ? `User: ${user.id} (Click for Details)` : "OFFLINE: Click to Connect"}
-                        >
-                            {/* Auth LED */}
-                            <div className="flex justify-between items-center mb-3 border-b border-red-900/30 pb-2">
-                                <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">DEBUGGER v3.14.1</span>
-                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
+                {/* Header */}
+                <header className="border-b border-[#29B6F6]/20 bg-[#151B23] p-4 shrink-0">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+                                <ArrowLeft className="h-5 w-5" />
+                            </Button>
+                            <div className="flex flex-col">
+                                <h1 className="text-xl font-bold flex items-center gap-2">
+                                    <span className="hidden sm:inline">Toolkit & Convertidor</span>
+                                    <span className="sm:hidden">Toolkit</span>
+                                    <span className="bg-blue-900/50 text-blue-200 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 font-mono">
+                                        v3.15 (MOBILE-UI)
+                                    </span>
+                                </h1>
                             </div>
-                            <span className="text-xs font-mono text-gray-400">
-                                {user ? "ONLINE" : "OFFLINE (LOGIN)"}
+
+                            {/* INDICATORS (Mobile Optimized) */}
+                            <div
+                                className="flex items-center gap-2 px-3 py-1 bg-black/30 rounded-full border border-white/10 hover:bg-white/10 cursor-pointer transition-colors"
+                                onClick={() => setShowDebugDialog(true)}
+                                title="Estado del Sistema"
+                            >
+                                <div className={`w-2 h-2 rounded-full ${user ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-red-500 animate-pulse"}`}></div>
+                                <span className="text-xs font-mono text-gray-300 hidden sm:inline">
+                                    {user ? "ONLINE" : "OFFLINE"}
+                                </span>
+                            </div>
+
+                            <div className="hidden sm:block w-px h-4 bg-white/20" />
+
+                            <span className="text-xs text-blue-400 hidden sm:inline">
+                                {loading ? (uploadStatus || "Procesando...") : "Listo"}
                             </span>
                         </div>
-                        <div className="w-px h-4 bg-white/20" />
-                        {/* Status Text */}
-                        <span className="text-xs text-blue-400">
-                            {loading ? (uploadStatus || "Procesando...") : "Listo para trabajar"}
-                        </span>
+
+                        <div className="flex items-center gap-2">
+                            {/* Mobile Actions Menu could go here, for now buttons wrap or scroll */}
+                            <Button variant="ghost" size="sm" onClick={() => setShowLibrary(!showLibrary)} className={showLibrary ? "bg-white/10" : ""}>
+                                <BookOpen className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Librería</span>
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => setShowDebugDialog(true)}>
+                                <AlertCircle className="h-5 w-5 text-gray-400" />
+                            </Button>
+                        </div>
                     </div>
 
-                    <Button variant="ghost" size="sm" onClick={() => setShowLibrary(!showLibrary)}>
-                        <BookOpen className="h-4 w-4 mr-2" /> Librería
-                    </Button>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setShowUploadDialog(true)}>
-                        <Upload className="h-4 w-4 mr-2" /> Subir ZIP/Pack
-                    </Button>
-                    <Button onClick={() => setShowSaveDialog(true)} disabled={!modelObject}>
-                        <Save className="h-4 w-4 mr-2" /> Guardar en Proyecto
-                    </Button>
-                    <Button variant="secondary" onClick={confirmSaveToProject} disabled={!modelObject}>
-                        <Save className="h-4 w-4 mr-2" /> Autosave Test
-                    </Button>
-                </div>
+                    {/* Secondary Toolbar - Scrollable on mobile */}
+                    <div className="flex gap-2 mt-2 overflow-x-auto pb-1 no-scrollbar sm:justify-end">
+                        <Button variant="outline" size="sm" onClick={() => setShowUploadDialog(true)} className="whitespace-nowrap">
+                            <Upload className="h-4 w-4 mr-2" /> Subir
+                        </Button>
+                        <Button
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700 text-white border border-purple-400/30 whitespace-nowrap"
+                            onClick={handleOpenAR}
+                            disabled={!modelObject}
+                        >
+                            <BoxIcon className="h-4 w-4 mr-2" /> AR / Proyectar
+                        </Button>
+                        <Button size="sm" onClick={() => setShowSaveDialog(true)} disabled={!modelObject} className="whitespace-nowrap">
+                            <Save className="h-4 w-4 mr-2" /> Guardar
+                        </Button>
+                    </div>
 
-            </header >
+                </header >
 
-            <div className="flex-1 flex overflow-hidden">
+                <div className="flex-1 flex overflow-hidden">
 
-                {/* 3D View */}
-                <div
-                    className="flex-1 relative bg-black/50"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                        e.preventDefault();
-                        const files = Array.from(e.dataTransfer.files);
-                        if (files.length > 0) processFiles(files);
-                    }}
-                >
-                    {/* Three.js Container */}
-                    <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
+                    {/* 3D View */}
+                    <div
+                        className="flex-1 relative bg-black/50"
+                        style={{ touchAction: 'none' }} // PREVENTS SCROLL ON MOBILE DRAG
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                            e.preventDefault();
+                            const files = Array.from(e.dataTransfer.files);
+                            if (files.length > 0) processFiles(files);
+                        }}
+                    >
+                        {/* Three.js Container */}
+                        <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
 
-                    {/* React Overlay - Empty State */}
-                    {!modelObject && (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none">
-                            <p>Arrastra un archivo aquí o usa "Subir ZIP"</p>
-                        </div>
-                    )}
-
-                    {/* CONTROL BAR (RESTORED) */}
-                    {modelObject && (
-                        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-[#151B23]/90 border border-white/10 p-3 rounded-lg backdrop-blur-md flex items-center gap-6 shadow-xl z-10 w-[90%] max-w-2xl justify-around">
-
-                            {/* Rotation */}
-                            <div className="flex flex-col items-center gap-1 w-32">
-                                <span className="text-[10px] text-gray-400 font-mono uppercase">Rotación</span>
-                                <Slider
-                                    value={[rotation]}
-                                    min={0} max={6.28} step={0.1}
-                                    onValueChange={([v]) => setRotation(v)}
-                                    className="w-full"
-                                />
-                            </div>
-
-                            {/* Height */}
-                            <div className="flex flex-col items-center gap-1 w-32">
-                                <span className="text-[10px] text-gray-400 font-mono uppercase">Altura</span>
-                                <Slider
-                                    value={[verticalPos]}
-                                    min={-5} max={5} step={0.1}
-                                    onValueChange={([v]) => setVerticalPos(v)}
-                                    className="w-full"
-                                />
-                            </div>
-
-                            {/* Color Toggle */}
-                            <div className="flex flex-col items-center gap-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] text-gray-400 font-mono uppercase">Pintura</span>
-                                    <Switch checked={isRxMode} onCheckedChange={setIsRxMode} />
-                                </div>
-                                {isRxMode && (
-                                    <input
-                                        type="color"
-                                        value={color}
-                                        onChange={(e) => setColor(e.target.value)}
-                                        className="w-8 h-6 bg-transparent cursor-pointer"
-                                    />
-                                )}
-                            </div>
-
-                            {/* Reset */}
-                            <Button variant="ghost" size="icon" onClick={resetCamera} title="Reset Camera">
-                                <RefreshCw className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Library Sidebar */}
-                {showLibrary && (
-                    <div className="w-80 border-l border-white/10 bg-[#151B23] p-4 overflow-y-auto flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold">Tu Librería</h3>
-                            <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading}>
-                                <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                            </Button>
-                        </div>
-
-                        {/* Error Message */}
-                        {libraryError && (
-                            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded mb-4 text-xs text-red-200">
-                                ⚠️ {libraryError}
+                        {/* React Overlay - Empty State */}
+                        {!modelObject && (
+                            <div className="absolute inset-0 flex items-center justify-center text-gray-500 pointer-events-none p-4 text-center">
+                                <p>Arrastra un archivo aquí o usa "Subir ZIP"</p>
                             </div>
                         )}
 
-                        {/* Projects / Models List */}
-                        <div className="space-y-4 flex-1">
-                            {userModels.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    <BoxIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">No tienes modelos guardados.</p>
-                                    <p className="text-xs mt-1">Sube uno para empezar.</p>
+                        {/* CONTROL BAR (MOBILE OPTIMIZED) */}
+                        {modelObject && (
+                            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-[#151B23]/90 border border-white/10 p-3 rounded-lg backdrop-blur-md flex items-center gap-4 shadow-xl z-10 w-[95%] max-w-2xl justify-around overflow-x-auto no-scrollbar">
+
+                                {/* Rotation */}
+                                <div className="flex flex-col items-center gap-1 min-w-[80px] w-full max-w-[120px]">
+                                    <span className="text-[9px] text-gray-400 font-mono uppercase">Rotación</span>
+                                    <Slider
+                                        value={[rotation]}
+                                        min={0} max={6.28} step={0.1}
+                                        onValueChange={([v]) => setRotation(v)}
+                                        className="w-full"
+                                    />
                                 </div>
-                            ) : (
-                                userModels.map(m => (
-                                    <div key={m.id} className="p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer group" onClick={() => handleLoadModel(m)}>
-                                        <div className="flex justify-between">
-                                            <p className="font-medium truncate" title={m.name || m.file_name}>
-                                                {m.name || m.file_name}
-                                            </p>
-                                            <Trash2 className="h-4 w-4 text-red-500 opacity-0 group-hover:opacity-100"
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteModel(e, m.id); }} />
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1 flex justify-between">
-                                            <span>{(m.size / 1024 / 1024).toFixed(1)} MB</span>
-                                            <span className="text-gray-600">{new Date(m.created_at).toLocaleDateString()}</span>
-                                        </p>
+
+                                {/* Height */}
+                                <div className="flex flex-col items-center gap-1 min-w-[80px] w-full max-w-[120px]">
+                                    <span className="text-[9px] text-gray-400 font-mono uppercase">Altura</span>
+                                    <Slider
+                                        value={[verticalPos]}
+                                        min={-5} max={5} step={0.1}
+                                        onValueChange={([v]) => setVerticalPos(v)}
+                                        className="w-full"
+                                    />
+                                </div>
+
+                                {/* Color Toggle */}
+                                <div className="flex flex-col items-center gap-1 shrink-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] text-gray-400 font-mono uppercase">Pintura</span>
+                                        <Switch checked={isRxMode} onCheckedChange={setIsRxMode} />
                                     </div>
-                                ))
+                                    {isRxMode && (
+                                        <input
+                                            type="color"
+                                            value={color}
+                                            onChange={(e) => setColor(e.target.value)}
+                                            className="w-8 h-6 bg-transparent cursor-pointer"
+                                        />
+                                    )}
+                                </div>
+
+                                {/* Reset */}
+                                <Button variant="ghost" size="icon" onClick={resetCamera} title="Reset Camera" className="shrink-0">
+                                    <RefreshCw className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Library Sidebar (Responsive) */}
+                    {showLibrary && (
+                        <div className="w-80 border-l border-white/10 bg-[#151B23] p-4 overflow-y-auto flex flex-col absolute inset-y-0 right-0 z-20 sm:static sm:z-0 shadow-2xl sm:shadow-none transition-all">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold">Tu Librería</h3>
+                                <div className="flex gap-2">
+                                    <Button variant="ghost" size="sm" onClick={loadAllData} disabled={loading}>
+                                        <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                    {/* Mobile Close Button */}
+                                    <Button variant="ghost" size="sm" className="sm:hidden" onClick={() => setShowLibrary(false)}>
+                                        <ArrowLeft className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Error Message */}
+                            {libraryError && (
+                                <div className="p-3 bg-red-500/20 border border-red-500/50 rounded mb-4 text-xs text-red-200">
+                                    ⚠️ {libraryError}
+                                </div>
                             )}
+
+                            {/* Projects / Models List */}
+                            <div className="space-y-4 flex-1">
+                                {userModels.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <BoxIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                        <p className="text-sm">No tienes modelos guardados.</p>
+                                        <p className="text-xs mt-1">Sube uno para empezar.</p>
+                                    </div>
+                                ) : (
+                                    userModels.map(m => (
+                                        <div key={m.id} className="p-3 bg-white/5 rounded hover:bg-white/10 cursor-pointer group" onClick={() => { handleLoadModel(m); if (window.innerWidth < 640) setShowLibrary(false); }}>
+                                            <div className="flex justify-between">
+                                                <p className="font-medium truncate max-w-[150px]" title={m.name || m.file_name}>
+                                                    {m.name || m.file_name}
+                                                </p>
+                                                <Trash2 className="h-4 w-4 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteModel(e, m.id); }} />
+                                            </div>
+                                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                        </select>
                         </div>
-                    </div>
-                )}
-            </div>
+                            <DialogFooter>
+                                <Button onClick={confirmSaveToProject}>Guardar</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                </Dialog>
 
-            {/* Overlays - Force FIXED to cover confirmed dialogs and everything */}
-            {
-                loading && (
-                    <div className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-[9999]">
-                        <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
-                        <p className="text-xl font-bold text-white">{uploadStatus || "Cargando..."}</p>
-                        {progress > 0 && <p className="text-lg text-blue-400 mt-2">{progress}%</p>}
-                    </div>
-                )
-            }
-            {/* Inputs and Dialogs */}
-            <input
-                type="file"
-                ref={fileInput3DRef}
-                className="hidden"
-                multiple
-                accept=".glb,.gltf,.obj,.fbx,.zip"
-                onChange={handle3DFileChange}
-            />
+                {/* AR DIALOG */}
+                <Dialog open={showArDialog} onOpenChange={setShowArDialog}>
+                    <DialogContent className="sm:max-w-md bg-[#151B23] border border-gray-700 text-white">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <BoxIcon className="text-purple-400" /> Visualizador AR
+                            </DialogTitle>
+                            <DialogDescription className="text-gray-400">
+                                Escanea el código con tu celular o usa los botones si ya estás en móvil.
+                            </DialogDescription>
+                        </DialogHeader>
 
-            <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Guardar Modelo</DialogTitle></DialogHeader>
-                    <div className="space-y-4">
-                        <input
-                            className="w-full p-2 bg-black/20 border rounded"
-                            placeholder="Nombre del modelo"
-                            value={saveData.name}
-                            onChange={e => setSaveData(prev => ({ ...prev, name: e.target.value }))}
-                        />
-                        <select
-                            className="w-full p-2 bg-black/20 border rounded"
-                            value={saveData.projectId}
-                            onChange={e => setSaveData(prev => ({ ...prev, projectId: e.target.value }))}
-                        >
-                            <option value="">-- Nuevo Proyecto --</option>
-                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
-                    <DialogFooter>
-                        <Button onClick={confirmSaveToProject}>Guardar</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                        <Tabs defaultValue="ios" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 bg-black/40">
+                                <TabsTrigger value="ios">iOS (iPhone/iPad)</TabsTrigger>
+                                <TabsTrigger value="android">Android</TabsTrigger>
+                            </TabsList>
 
-            {/* AR DIALOG */}
-            <Dialog open={showArDialog} onOpenChange={setShowArDialog}>
-                <DialogContent className="sm:max-w-md bg-[#151B23] border border-gray-700 text-white">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <BoxIcon className="text-purple-400" /> Visualizador AR
-                        </DialogTitle>
-                        <DialogDescription className="text-gray-400">
-                            Escanea el código con tu celular o usa los botones si ya estás en móvil.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <Tabs defaultValue="ios" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 bg-black/40">
-                            <TabsTrigger value="ios">iOS (iPhone/iPad)</TabsTrigger>
-                            <TabsTrigger value="android">Android</TabsTrigger>
-                        </TabsList>
-
-                        {/* iOS TAB */}
-                        <TabsContent value="ios" className="flex flex-col items-center gap-4 py-4">
-                            <div className="bg-white p-2 rounded-lg">
-                                {/* NOTE: In production, URL.createObjectURL won't work cross-device via QR. 
+                            {/* iOS TAB */}
+                            <TabsContent value="ios" className="flex flex-col items-center gap-4 py-4">
+                                <div className="bg-white p-2 rounded-lg">
+                                    {/* NOTE: In production, URL.createObjectURL won't work cross-device via QR. 
                                     Ideally we upload to cloud and share URL. 
                                     For now, we use Blob URL (works if user is on SAME device). 
                                     To fix cross-device, we'd need to upload first. 
                                     Let's warn user or auto-upload? 
                                     Actually, standard practice for local generator is just download.
                                 */}
-                                <QRCodeSVG value={arUrls.usdz || ""} size={150} />
-                            </div>
-                            <p className="text-xs text-center text-gray-400 px-4">
-                                * Nota: El QR solo funciona si ambos dispositivos comparten la sesión (Blob local).
-                                Para compartir real, usa "Subir a Librería" primero.
-                            </p>
-                            <a
-                                href={arUrls.usdz}
-                                rel="ar"
-                                download="model.usdz"
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded font-bold flex items-center justify-center gap-2"
-                            >
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/c/ca/IOS_logo_2013.svg" className="w-4 h-4 invert" alt="iOS" />
-                                Abrir en AR Quick Look
-                            </a>
-                        </TabsContent>
+                                    <QRCodeSVG value={arUrls.usdz || ""} size={150} />
+                                </div>
+                                <p className="text-xs text-center text-gray-400 px-4">
+                                    * Nota: El QR solo funciona si ambos dispositivos comparten la sesión (Blob local).
+                                    Para compartir real, usa "Subir a Librería" primero.
+                                </p>
+                                <a
+                                    href={arUrls.usdz}
+                                    rel="ar"
+                                    download="model.usdz"
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded font-bold flex items-center justify-center gap-2"
+                                >
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/ca/IOS_logo_2013.svg" className="w-4 h-4 invert" alt="iOS" />
+                                    Abrir en AR Quick Look
+                                </a>
+                            </TabsContent>
 
-                        {/* ANDROID TAB */}
-                        <TabsContent value="android" className="flex flex-col items-center gap-4 py-4">
-                            <div className="bg-white p-2 rounded-lg">
-                                <QRCodeSVG value={arUrls.glb || ""} size={150} />
-                            </div>
-                            <a
-                                href={`intent://view?file=${encodeURIComponent(arUrls.glb)}#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end;`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="w-full bg-green-600 hover:bg-green-700 text-white text-center py-2 rounded font-bold flex items-center justify-center gap-2"
-                            >
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/d/d7/Android_robot.svg" className="w-4 h-4" alt="Android" />
-                                Abrir en Scene Viewer
-                            </a>
-                        </TabsContent>
-                    </Tabs>
-                </DialogContent>
-            </Dialog>
+                            {/* ANDROID TAB */}
+                            <TabsContent value="android" className="flex flex-col items-center gap-4 py-4">
+                                <div className="bg-white p-2 rounded-lg">
+                                    <QRCodeSVG value={arUrls.glb || ""} size={150} />
+                                </div>
+                                <a
+                                    href={`intent://view?file=${encodeURIComponent(arUrls.glb)}#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end;`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="w-full bg-green-600 hover:bg-green-700 text-white text-center py-2 rounded font-bold flex items-center justify-center gap-2"
+                                >
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d7/Android_robot.svg" className="w-4 h-4" alt="Android" />
+                                    Abrir en Scene Viewer
+                                </a>
+                            </TabsContent>
+                        </Tabs>
+                    </DialogContent>
+                </Dialog>
 
-            <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Subir Archivos</DialogTitle></DialogHeader>
-                    <div className="grid place-items-center p-8 border-2 border-dashed rounded cursor-pointer hover:bg-white/5" onClick={() => fileInput3DRef.current?.click()}>
-                        <Upload className="h-8 w-8 mb-2" />
-                        <p onClick={(e) => { e.stopPropagation(); fileInput3DRef.current?.click(); }}>Clic para seleccionar archivos (Forzar)</p>
-                    </div>
-                </DialogContent>
-            </Dialog>
-        </div >
-    );
+                <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                    <DialogContent>
+                        <DialogHeader><DialogTitle>Subir Archivos</DialogTitle></DialogHeader>
+                        <div className="grid place-items-center p-8 border-2 border-dashed rounded cursor-pointer hover:bg-white/5" onClick={() => fileInput3DRef.current?.click()}>
+                            <Upload className="h-8 w-8 mb-2" />
+                            <p onClick={(e) => { e.stopPropagation(); fileInput3DRef.current?.click(); }}>Clic para seleccionar archivos (Forzar)</p>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div >
+            );
 }
 
-export default Converter;
+            export default Converter;
