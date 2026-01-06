@@ -54,7 +54,7 @@ export function AuthProvider({ children }) {
     if (!supabase) { setLoading(false); return; }
 
     const initAuth = async () => {
-      logAuth('Init: v3.9 (AUTO-FIX) - Hash Protection');
+      logAuth('Init: v3.10 (RE-LOGIN) - Hash Protection');
 
       // 1. Check for OAuth Hash/Code
       const hash = window.location.hash;
@@ -139,31 +139,16 @@ export function AuthProvider({ children }) {
           }
 
           // If we are here, manual hijack failed.
-          logAuth('Manual Hijack Failed.');
+          logAuth('Manual Hijack Failed. Token likely invalid.');
 
-          // NUCLEAR OPTION: Auto-Clean Storage if stuck
-          const hasTriedClean = sessionStorage.getItem('visorx_auto_clean');
-          if (!hasTriedClean) {
-            logAuth('CRITICAL: Possible LocalStorage Corruption. Nuking and Retrying...');
-            localStorage.removeItem('visorx_user');
-            Object.keys(localStorage).forEach(key => {
-              if (key.startsWith('sb-')) localStorage.removeItem(key);
-            });
-            sessionStorage.setItem('visorx_auto_clean', 'true');
-            window.location.reload();
-            return;
-          }
-
-          logAuth('Auto-Clean already tried. Waiting up to 6s for events...');
-          setTimeout(() => {
-            setLoading((prev) => {
-              if (prev) {
-                logAuth('Safety Timeout: Unlocking UI (Offline).');
-                return false;
-              }
-              return prev;
-            });
-          }, 6000);
+          // NUCLEAR OPTION 2.0: Nuke Storage AND Redirect to Login (Fresh Start)
+          logAuth('CRITICAL: Token Rejected. Nuking and Redirecting to Login...');
+          localStorage.removeItem('visorx_user');
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-')) localStorage.removeItem(key);
+          });
+          // Force clean URL and fresh login
+          window.location.href = '/login?error=auth_reset';
 
         } else {
           // No Hash, No Session -> Check Local Fallbacks
