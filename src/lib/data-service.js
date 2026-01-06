@@ -58,13 +58,13 @@ export async function listProjects(authUser = null) {
   return data ?? [];
 }
 
-// CREATE PROJECT
+// CREATE PROJECT (Reverted to Standard Insert with Logging)
 export async function createProject(projectData, authUser = null) {
   try {
+    console.log("STEP 2a: createProject started");
     const user = await requireUser(authUser);
 
-    // DEBUG ALERT
-    console.log('Creating project for user:', user.id);
+    console.log("STEP 2b: User ID confirmed:", user.id);
 
     const payload = {
       name: projectData.name,
@@ -74,26 +74,28 @@ export async function createProject(projectData, authUser = null) {
       created_at: new Date().toISOString()
     };
 
-    // RPC REQUEST (Bypasses Table API / RLS)
-    const promise = supabase.rpc('create_project_safe', {
-      p_name: projectData.name,
-      p_description: projectData.description,
-      p_user_id: user.id
-    });
+    console.log("STEP 2c: Inserting project payload:", payload);
 
-    // Note: RPC returns 'data' directly, not structured as {data, error} in the promise result usually, 
-    // but allow Supabase client normalization.
-    const { data, error } = await withTimeout(promise, 25000, 'rpc.create_project_safe');
+    // STANDARD INSERT (No RPC)
+    const promise = supabase
+      .from('projects')
+      .insert(payload)
+      .select()
+      .single();
+
+    // 10s Explicit Timeout
+    const { data, error } = await withTimeout(promise, 10000, 'projects.insert');
 
     if (error) {
-      alert(`DB Error (Projects): ${error.message} - Code: ${error.code}`);
+      console.error("STEP 2d: Project Insert Error:", error);
       throw error;
     }
 
+    console.log("STEP 2e: Project created successfully:", data);
     return data;
   } catch (err) {
-    alert(`Fatal Project Error: ${err.message}`);
-    throw err;
+    console.error("STEP 2f: Fatal Project Error:", err);
+    throw new Error(`Error creando proyecto: ${err.message}`);
   }
 }
 
@@ -124,18 +126,25 @@ function safeName(name = 'file') {
 
 export async function uploadModelToCloud({ file, projectId, onStep, authUser }) {
   if (!file) throw new Error('No se recibió archivo.');
+  console.log("STEP 4: uploadModelToCloud started");
+
   const user = await requireUser(authUser);
 
+  console.log("STEP 5: Picking bucket...");
   const bucket = await pickBucket();
+  console.log("STEP 5b: Bucket selected:", bucket);
+
   const fileName = safeName(file.name || 'model.glb');
   const ext = fileName.includes('.') ? fileName.split('.').pop() : '';
   const ts = Date.now();
   const path = `${user.id}/${projectId}/${ts}-${fileName}`;
 
-  // STEP 2: upload file (with retry + timeout)
+  // STEP 6: upload file (with retry + timeout)
   onStep?.({ step: 2, total: 3, message: `Subiendo archivo a la nube (${bucket})...` });
+  console.log("STEP 6: Starting Storage Upload to:", path);
 
-  await retry(async () => {
+  await retry(async (attempt) => {
+    console.log(`STEP 6b: Upload attempt ${attempt + 1}`);
     const uploadPromise = supabase.storage
       .from(bucket)
       .upload(path, file, {
@@ -144,18 +153,21 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser }) 
         contentType: file.type || undefined
       });
 
-    const { data, error } = await withTimeout(uploadPromise, 20000, 'storage.upload');
+    const { data, error } = await withTimeout(uploadPromise, 10000, 'storage.upload');
     if (error) throw error;
+    console.log("STEP 6c: Upload successful:", data);
     return data;
   }, { retries: 3, baseDelayMs: 500, label: 'storage.upload' });
 
-  // STEP 3: insert DB record (with retry + timeout)
+  // STEP 7: insert DB record (with retry + timeout)
   onStep?.({ step: 3, total: 3, message: 'Registrando modelo en la base de datos...' });
+  console.log("STEP 7: Registering model in DB...");
 
   const record = await retry(async () => {
     // Get PUBLIC URL
     const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(path);
     const publicUrl = publicUrlData.publicUrl;
+    console.log("STEP 7b: Public URL generated:", publicUrl);
 
     const payload = {
       project_id: projectId,
@@ -173,8 +185,9 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser }) 
       .select()
       .single();
 
-    const { data, error } = await withTimeout(insertPromise, 5000, 'db.insert');
+    const { data, error } = await withTimeout(insertPromise, 10000, 'model.insert');
     if (error) throw error;
+    console.log("STEP 7c: Model registered:", data);
     return data;
   }, { retries: 3, baseDelayMs: 500, label: 'db.insert' });
 
@@ -182,23 +195,33 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser }) 
 }
 
 export async function saveModelFlow({ file, selectedProjectId, onStep, authUser }) {
+  console.log("STEP 1: saveModelFlow started");
   onStep?.({ step: 1, total: 3, message: 'Verificando sesión y proyecto...' });
 
   let projectId = selectedProjectId;
 
   // Ensure user exists
+  console.log("STEP 1b: checking user...");
   await requireUser(authUser);
+  console.log("STEP 1c: user confirmed");
 
   // Ensure project exists
   if (!projectId) {
+    console.log("STEP 2: Creating new project...");
     const project = await createProject({ name: 'Nuevo Proyecto', description: 'Proyecto creado automáticamente' }, authUser);
     projectId = project.id;
+    console.log("STEP 2: Project created, ID:", projectId);
+  } else {
+    console.log("STEP 2: Using existing project:", projectId);
   }
 
   try {
+    console.log("STEP 3: Calling uploadModelToCloud...");
     const result = await uploadModelToCloud({ file, projectId, onStep, authUser });
+    console.log("STEP 8: Workflow Complete!", result);
     return { projectId, ...result };
   } catch (e) {
+    console.error("Workflow Failed:", e);
     await markProjectError(projectId, e?.message || e);
     throw e;
   }
