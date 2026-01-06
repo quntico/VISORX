@@ -125,9 +125,15 @@ function safeName(name = 'file') {
   return name.replace(/[^\w.\-]+/g, '_');
 }
 
-export async function uploadModelToCloud({ file, projectId, onStep, authUser }) {
+export async function uploadModelToCloud({ file, projectId, onStep, authUser, name }) {
   if (!file) throw new Error('No se recibió archivo.');
   if (!projectId) throw new Error('Project ID missing for upload.');
+
+  // ... (lines 132-176 abbreviated in thought, but keeping full function context isn't possible with replace_file small chunk. I will use a larger chunk or targeted replacement)
+  // Actually, I can just replace the signature and the payload construction.
+  // Wait, I need to replace line 128 (signature) AND line 177 (payload). They are far apart.
+  // I'll use multi_replace.
+
 
   console.log("STEP 4: uploadModelToCloud started");
 
@@ -177,6 +183,7 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser }) 
     const payload = {
       project_id: projectId,
       user_id: user.id,
+      name: name || fileName, // PREFER USER NAME
       file_path: `${bucket}:${path}`,
       file_url: publicUrl, // ESSENTIAL for the viewer
       file_name: fileName,
@@ -212,12 +219,17 @@ async function recoverSession() {
       localStorage.removeItem(key);
     }
   });
-
   // 3. Force Reload
   window.location.reload();
 }
 
-export async function saveModelFlow({ file, selectedProjectId, onStep, authUser }) {
+export async function saveModelFlow({ file, selectedProjectId, onStep, authUser, name }) {
+  // ...
+  // (skipping logic)
+  // ...
+  // Line 317 needs update
+  // I need to start higher to replace signature.
+
   const start = Date.now();
   console.log("start-flow: saveModelFlow started");
 
@@ -314,7 +326,7 @@ export async function saveModelFlow({ file, selectedProjectId, onStep, authUser 
   // 4. UPLOAD
   try {
     console.log(`STEP 3: Calling uploadModelToCloud with ID: ${projectId}...`);
-    const result = await uploadModelToCloud({ file, projectId, onStep, authUser: sessionUser });
+    const result = await uploadModelToCloud({ file, projectId, onStep, authUser: sessionUser, name });
     console.log(`STEP 8: Workflow Complete! Total time: ${Date.now() - start}ms`, result);
     return { projectId, ...result };
   } catch (e) {

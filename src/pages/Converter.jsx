@@ -102,7 +102,7 @@ function Converter() {
 
             const { data, error } = await supabase
                 .from("models")
-                .select("id,name,created_at,file_path,project_id,user_id")
+                .select("id,name,file_name,created_at,file_path,project_id,user_id")
                 .eq("user_id", currentUser.id)
                 .order("created_at", { ascending: false });
 
@@ -205,6 +205,7 @@ function Converter() {
                 file: fileToUpload,
                 selectedProjectId: targetProjectId,
                 authUser: user,
+                name: saveData.name, // PASS NAME
                 onStep: (info) => {
                     setUploadStatus(info.message);
                     setProgress(Math.round((info.step / info.total) * 100));
