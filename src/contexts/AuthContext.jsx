@@ -54,7 +54,7 @@ export function AuthProvider({ children }) {
     if (!supabase) { setLoading(false); return; }
 
     const initAuth = async () => {
-      logAuth('Init: v5.1 - Aggressive Hash Hijack');
+      logAuth('Init: v3.9 (AUTO-FIX) - Hash Protection');
 
       // 1. Check for OAuth Hash/Code
       const hash = window.location.hash;
@@ -139,7 +139,22 @@ export function AuthProvider({ children }) {
           }
 
           // If we are here, manual hijack failed.
-          logAuth('Manual Hijack Failed. Waiting up to 6s for events...');
+          logAuth('Manual Hijack Failed.');
+
+          // NUCLEAR OPTION: Auto-Clean Storage if stuck
+          const hasTriedClean = sessionStorage.getItem('visorx_auto_clean');
+          if (!hasTriedClean) {
+            logAuth('CRITICAL: Possible LocalStorage Corruption. Nuking and Retrying...');
+            localStorage.removeItem('visorx_user');
+            Object.keys(localStorage).forEach(key => {
+              if (key.startsWith('sb-')) localStorage.removeItem(key);
+            });
+            sessionStorage.setItem('visorx_auto_clean', 'true');
+            window.location.reload();
+            return;
+          }
+
+          logAuth('Auto-Clean already tried. Waiting up to 6s for events...');
           setTimeout(() => {
             setLoading((prev) => {
               if (prev) {
@@ -175,6 +190,9 @@ export function AuthProvider({ children }) {
         if (window.location.pathname === '/login') {
           window.location.replace('/dashboard');
         }
+
+        // Cleanup Auto-Fix Flag if success
+        sessionStorage.removeItem('visorx_auto_clean');
       } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESH_FAILED') {
         if (event === 'TOKEN_REFRESH_FAILED') {
           console.warn("CRITICAL: Token Refresh Failed. Nuking storage.");
