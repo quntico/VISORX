@@ -586,7 +586,7 @@ function Converter() {
                                     <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                     <span className="sm:hidden">Toolkit</span>
                                     <span className="bg-blue-900/50 text-blue-200 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 font-mono">
-                                        v3.15.1 (AUTO-LOAD)
+                                        v3.15.2 (FORCE-UPDATE)
                                     </span>
                                 </h1>
                             </div>
@@ -693,8 +693,8 @@ function Converter() {
 
                                 {/* Version Display */}
                                 <div className="bg-[#151B23] px-3 py-1.5 rounded border border-[#1E293B]">
-                                    <span className="text-[#29B6F6] text-xs font-bold">v3.15.1</span>
-                                    <span className="text-gray-500 text-[10px] ml-2 font-mono">(AUTO-LOAD)</span>
+                                    <span className="text-[#29B6F6] text-xs font-bold">v3.15.2</span>
+                                    <span className="text-gray-500 text-[10px] ml-2 font-mono">(FORCE-UPDATE)</span>
                                 </div>
 
                                 {/* Color Toggle */}

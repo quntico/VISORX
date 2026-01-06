@@ -8,11 +8,14 @@ import Login from '@/pages/Login'; // RESTORING LOGIN
 import { DebugErrorBoundary } from '@/components/DebugErrorBoundary';
 
 // STAGE 21: FULL APP SKELETON (Providers + Dashboard + Green Converter)
+import { VersionManager } from '@/components/VersionManager';
+
 function App() {
   return (
-    <LanguageProvider>
+    <Router>
+      <VersionManager />
       <AuthProvider>
-        <Router>
+        <LanguageProvider>
           {/* Removed Debug Bar - Going for Real UI */}
           <Routes>
             {/* PUBLIC */}
