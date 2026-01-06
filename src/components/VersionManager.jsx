@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 
-const APP_VERSION = '3.17.7';
+const APP_VERSION = '3.17.8';
 
 export function VersionManager() {
   const { toast } = useToast();
@@ -49,10 +49,13 @@ export function VersionManager() {
           });
 
           // 4. Hard Reload (Force Get)
+          // DISABLE AUTO-RELOAD to prevent loops if server cache is stale
+          /* 
           setTimeout(() => {
             console.log("[VersionManager] RELOADING NOW...");
             window.location.reload(true);
           }, 1000);
+          */
         }
       } catch (error) {
         console.error("[VersionManager] Check failed:", error);
