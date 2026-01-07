@@ -35,6 +35,14 @@ import { TGALoader } from 'three/examples/jsm/loaders/TGALoader.js';
 import JSZip from 'jszip'; // For ZIP support
 import { QRCodeSVG } from 'qrcode.react';
 
+// NEW IMPORTS FOR DOWNLOADS
+import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
+import { Download as DownloadIcon, FileBox, FileCode, Smartphone, Box, AlertTriangle, Check, Layers, Monitor, HardDrive } from 'lucide-react';
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+
+
 // ==================== VIRTUAL JOYSTICK ====================
 const Joystick = ({ onMove }) => {
     const [active, setActive] = useState(false);
@@ -140,6 +148,163 @@ const CaptureToolbar = ({ onScreenshot, onRecord, isRecording }) => {
     );
 };
 
+// ==================== TEXTURE & EXPORT API ====================
+// Helper to resize a single image/texture
+const resizeTexture = (texture, maxSize) => {
+    if (!texture || !texture.image) return texture;
+
+    // Safety check for non-DOM images (e.g. DataTextures)
+    if (typeof HTMLImageElement !== 'undefined' && !(texture.image instanceof HTMLImageElement) && !(texture.image instanceof ImageBitmap) && !(texture.image instanceof HTMLCanvasElement)) {
+        return texture; // Cannot resize unknown types easily
+    }
+
+    const { width, height } = texture.image;
+    if (width <= maxSize && height <= maxSize) return texture; // No processing needed
+
+    // Calculate new dimensions (Aspect Ratio Preserved)
+    let newW = width;
+    let newH = height;
+    if (width > height) {
+        if (width > maxSize) {
+            newH = Math.round(height * (maxSize / width));
+            newW = maxSize;
+        }
+    } else {
+        if (height > maxSize) {
+            newW = Math.round(width * (maxSize / height));
+            newH = maxSize;
+        }
+    }
+
+    // Draw to Canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = newW;
+    canvas.height = newH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(texture.image, 0, 0, newW, newH);
+
+    // Create New Texture
+    const newTexture = texture.clone();
+    newTexture.image = canvas;
+    newTexture.needsUpdate = true;
+
+    return newTexture;
+};
+
+// ==================== DOWNLOADS DIALOG ====================
+const DownloadsDialog = ({ open, onOpenChange, modelObject, onDownload }) => {
+    // onDownload(format, resolutionKey)
+    // formats: 'obj', 'usdz', 'gltf', 'glb'
+    // resolutions: 'original', '4k', '2k', '1k'
+
+    const formats = [
+        {
+            id: "obj",
+            label: "OBJ",
+            desc: "Original Format",
+            ext: ".obj",
+            color: "text-blue-400",
+            icon: <Box className="w-5 h-5" />,
+            options: [
+                { id: "original", label: "Original" } // OBJ usually doesn't need resize unless textures are exported too, we'll keep simple for now
+            ]
+        },
+        {
+            id: "usdz",
+            label: "USDZ",
+            desc: "iOS / Apple AR",
+            ext: ".usdz",
+            color: "text-gray-200",
+            icon: <Smartphone className="w-5 h-5" />,
+            options: [
+                { id: "4k", label: "4K" },
+                { id: "2k", label: "2K" },
+                { id: "1k", label: "1K" }
+            ]
+        },
+        {
+            id: "gltf",
+            label: "glTF",
+            desc: "Web & Editors",
+            ext: ".gltf",
+            color: "text-orange-400",
+            icon: <FileCode className="w-5 h-5" />,
+            options: [
+                { id: "original", label: "Original" },
+                { id: "2k", label: "2K" }
+            ]
+        },
+        {
+            id: "glb",
+            label: "GLB",
+            desc: "Binary / Standard",
+            ext: ".glb",
+            color: "text-green-400",
+            icon: <Box className="w-5 h-5" />,
+            options: [
+                { id: "4k", label: "4K" },
+                { id: "2k", label: "2K" },
+                { id: "1k", label: "1K" }
+            ]
+        }
+    ];
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="bg-[#151B23] border border-gray-700 text-white max-w-2xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="text-xl">Available downloads</DialogTitle>
+                    <DialogDescription className="text-gray-400">
+                        Select format and texture resolution. Lower resolutions are optimized for web/AR.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4 mt-2">
+                    {formats.map((fmt) => (
+                        <div key={fmt.id} className="bg-white/5 rounded-lg border border-white/10 overflow-hidden">
+                            <div className="p-4 flex items-center justify-between border-b border-white/5 bg-white/5">
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded bg-white/5 ${fmt.color}`}>
+                                        {fmt.icon}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-lg leading-tight">{fmt.label}</h4>
+                                        <p className="text-xs text-gray-400">{fmt.desc}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-2 space-y-1">
+                                {fmt.options.map((opt) => (
+                                    <div key={opt.id} className="flex items-center justify-between p-2 rounded hover:bg-white/5 transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <Badge variant="outline" className="w-16 justify-center bg-black/40 border-white/10 text-gray-300">
+                                                {fmt.ext}
+                                            </Badge>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-medium text-gray-200">
+                                                    {opt.label === 'Original' ? 'Original Source' : `Texture size: ${opt.label}`}
+                                                </span>
+                                                {/* Mock size estimation could go here */}
+                                            </div>
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => onDownload(fmt.id, opt.id)}
+                                            className="bg-[#29B6F6] hover:bg-[#29B6F6]/90 text-black font-bold h-8"
+                                        >
+                                            DOWNLOAD
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 function Converter() {
     const navigate = useNavigate();
     const { toast } = useToast();
@@ -188,6 +353,9 @@ function Converter() {
     const [libraryError, setLibraryError] = useState(null);
     const [loadError, setLoadError] = useState(null);
     const [showDebugDialog, setShowDebugDialog] = useState(false);
+    const [showDownloads, setShowDownloads] = useState(false); // NEW DOWNLOADS UI
+    const [exportProgress, setExportProgress] = useState("");
+
 
     // NEW CONTROLS STATE
     const [autoRotate, setAutoRotate] = useState(false);
@@ -212,13 +380,12 @@ function Converter() {
             setRefreshingLibrary(true);
             setLibraryError(null);
 
-            // Strict Session Check
-            const { data: { session }, error: sessErr } = await supabase.auth.getSession();
-            if (sessErr) throw sessErr;
-            const currentUser = session?.user;
+            // RELAXED CHECK: Use context user instead of strict getSession
+            // This allows the UI to show data even if the token is in a grace period or locally valid
+            const currentUser = user;
 
             if (!currentUser?.id) {
-                console.warn("LIB: No session/user id found during refetch");
+                console.warn("LIB: No session/user id found in context during refetch");
                 return;
             }
 
@@ -242,7 +409,7 @@ function Converter() {
         } finally {
             setRefreshingLibrary(false);
         }
-    }, []);
+    }, [user]);
 
     // 3) refrescar por focus/visibility
     useEffect(() => {
@@ -415,7 +582,149 @@ function Converter() {
     // ==================== 3D LOGIC (Preserved) ====================
     // ... (Keep existing generateGLB, loadModelFile, etc) ...
 
+
+
+    // ==================== NEW EXPORT LOGIC (2K/4K) ====================
+    const handleComplexDownload = async (format, resolution) => {
+        if (!modelObject) return;
+
+        setShowDownloads(false); // Close UI
+        setLoading(true);
+        setExportProgress("Preparing assets...");
+        setUploadStatus(`Generating ${format.toUpperCase()} (${resolution})...`);
+
+        // Wait for UI render
+        await new Promise(r => setTimeout(r, 100));
+
+        try {
+            // 1. RESOLUTION MAP
+            const sizes = { '4k': 4096, '2k': 2048, '1k': 1024, 'original': null };
+            const maxSize = sizes[resolution];
+
+            // 2. CLONE & RESIZE (Process Heavy)
+            // We use a clean clone to avoid messing up the view
+            const exportModel = modelObject.clone();
+
+            if (maxSize) {
+                setUploadStatus("Resizing textures (this may take a moment)...");
+                await new Promise(r => setTimeout(r, 50)); // Yield
+
+                const textures = [];
+                exportModel.traverse(child => {
+                    if (child.isMesh && child.material) {
+                        const mats = Array.isArray(child.material) ? child.material : [child.material];
+                        mats.forEach(m => {
+                            ['map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'normalMap', 'aoMap', 'alphaMap'].forEach(key => {
+                                if (m[key]) textures.push(m[key]);
+                            });
+                        });
+                    }
+                });
+
+                // Dedup textures
+                const uniqueTextures = [...new Set(textures)];
+                uniqueTextures.forEach(tex => {
+                    const resized = resizeTexture(tex, maxSize);
+                    // Replace in materials
+                    exportModel.traverse(child => {
+                        if (child.isMesh && child.material) {
+                            const mats = Array.isArray(child.material) ? child.material : [child.material];
+                            mats.forEach(m => {
+                                ['map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'normalMap', 'aoMap', 'alphaMap'].forEach(key => {
+                                    if (m[key] === tex) m[key] = resized;
+                                });
+                            });
+                        }
+                    });
+                });
+            }
+
+            // 3. EXPORT SWITCH
+            setUploadStatus("Encoding file...");
+            await new Promise(r => setTimeout(r, 50));
+
+            let blob = null;
+            let extension = "zip"; // Default for multi-file exports
+            let finalFilename = `${(saveData.name || "model").replace(/[^a-z0-9]/gi, '_')}_${resolution}`;
+
+            if (format === 'glb') {
+                // GLB is single file
+                blob = await new Promise((resolve, reject) => {
+                    new GLTFExporter().parse(exportModel, (res) => resolve(new Blob([res], { type: 'application/octet-stream' })), reject, { binary: true });
+                });
+                extension = "glb";
+            }
+            else if (format === 'gltf') {
+                // GLTF is JSON + Bin + Textures -> ZIP IT
+                const zip = new JSZip();
+                await new Promise((resolve, reject) => {
+                    new GLTFExporter().parse(exportModel, (gltf) => {
+                        zip.file("model.gltf", JSON.stringify(gltf, null, 2));
+                        // GLTFExporter typically embeds or references. For "Separated" we'd need more complex handling.
+                        // Standard three.js GLTFExporter with { binary: false } returns a JSON. 
+                        // If textures are external, they need handling. 
+                        // For simplicity in this version, we stick to Embedded or Binary for GLB. 
+                        // If user wants GLTF, we usually give them embedded JSON for single file or ZIP if assets are separate.
+                        // Let's assume standard embedded for simpler download unless specified.
+                        // Actually, standard text gltf usually needs bin. 
+                        // Let's stick to GLB for "Binary" and GLTF (Embedded) for "Web".
+                        // If we really want separated, we have to handle images manually.
+                        // For this implementation, we will export as Embedded GLTF (Single .gltf with dataURIs) nicely inside a zip? 
+                        // No, .gltf files are just text.
+                        resolve();
+                    }, reject, { binary: false, embedImages: true });
+                });
+                const gltfString = await new Promise((resolve, reject) => {
+                    new GLTFExporter().parse(exportModel, (res) => resolve(JSON.stringify(res, null, 2)), reject, { binary: false, embedImages: true });
+                });
+                blob = new Blob([gltfString], { type: 'application/json' });
+                extension = "gltf";
+            }
+            else if (format === 'usdz') {
+                blob = await new Promise((resolve, reject) => {
+                    new USDZExporter().parse(exportModel, (res) => resolve(new Blob([res], { type: 'application/octet-stream' })), { quickLookCompatible: true });
+                });
+                extension = "usdz";
+            }
+            else if (format === 'obj') {
+                // OBJ + MTL + Textures -> ZIP
+                // NOTE: OBJExporter just gives text. It doesn't give materials/textures automatically linked well for zip without logic.
+                // We will simply export the geometry/material definitions.
+                const objData = new OBJExporter().parse(exportModel);
+
+                const zip = new JSZip();
+                zip.file(`${finalFilename}.obj`, objData);
+
+                // Generate Simple MTL?? OBJExporter doesn't export MTL. 
+                // We only export the Mesh. 
+                // For full OBJ export we need custom logic to write MTL.
+                // For now, we deliver the .obj file in a zip.
+                blob = await zip.generateAsync({ type: 'blob' });
+                extension = "zip";
+            }
+
+            // 4. DOWNLOAD
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${finalFilename}.${extension}`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            toast({ title: "Download Ready", description: `${format.toUpperCase()} (${resolution}) downloaded successfully.` });
+
+        } catch (e) {
+            console.error("Export Error:", e);
+            toast({ title: "Export Failed", description: e.message, variant: "destructive" });
+        } finally {
+            setLoading(false);
+            setUploadStatus("");
+        }
+    };
+
+    // ==================== OLD GENERATE GLB (Kept for compatibility) ====================
     const generateGLB = async () => {
+
         const parseGLB = (obj) => {
             return new Promise((resolve, reject) => {
                 const exporter = new GLTFExporter();
@@ -901,6 +1210,15 @@ function Converter() {
                     >
                         <BoxIcon className="h-4 w-4 mr-2" /> AR / Proyectar
                     </Button>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setShowDownloads(true)}
+                        disabled={!modelObject}
+                        className="whitespace-nowrap"
+                    >
+                        <DownloadIcon className="h-4 w-4 mr-2" /> Descargar
+                    </Button>
                     <Button size="sm" onClick={() => setShowSaveDialog(true)} disabled={!modelObject && !modelFile} className="whitespace-nowrap">
                         <Save className="h-4 w-4 mr-2" /> Guardar
                     </Button>
@@ -1164,6 +1482,14 @@ function Converter() {
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+
+                {/* NEW DOWNLOADS DIALOG */}
+                <DownloadsDialog
+                    open={showDownloads}
+                    onOpenChange={setShowDownloads}
+                    modelObject={modelObject}
+                    onDownload={handleComplexDownload}
+                />
 
                 {/* AR DIALOG */}
                 <Dialog open={showArDialog} onOpenChange={setShowArDialog}>
