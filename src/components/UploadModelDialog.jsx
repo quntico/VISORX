@@ -18,9 +18,9 @@ function UploadModelDialog({ open, onOpenChange, onSubmit }) {
   const { toast } = useToast();
 
   const validateFile = (type, file) => {
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 1024 * 1024 * 1024; // 1GB (Increased for heavy OBJ files)
     if (file && file.size > maxSize) {
-      return { valid: false, message: 'File exceeds 50MB limit' };
+      return { valid: false, message: 'File exceeds 1GB limit' };
     }
 
     // Extension checks

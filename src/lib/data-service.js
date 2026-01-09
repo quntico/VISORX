@@ -164,7 +164,7 @@ export async function uploadModelToCloud({ file, projectId, onStep, authUser, na
         contentType: mimeType
       });
 
-    const { data, error } = await withTimeout(uploadPromise, 20000, 'storage.upload');
+    const { data, error } = await withTimeout(uploadPromise, 300000, 'storage.upload'); // 5 minutes for large files
     if (error) throw error;
     console.log("STEP 6c: Upload successful:", data);
     return data;
