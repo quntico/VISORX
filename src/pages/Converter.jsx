@@ -813,6 +813,10 @@ function Converter() {
 
         try {
             const extracted = [];
+
+            // Allow UI to update before heavy zip processing
+            await new Promise(r => setTimeout(r, 100));
+
             for (const f of files) {
                 if (f.name.toLowerCase().endsWith('.zip') || f.name.toLowerCase().endsWith('.rar')) {
                     const zip = new JSZip();
@@ -850,7 +854,24 @@ function Converter() {
         const url = URL.createObjectURL(file);
         const ext = file.name.split('.').pop().toLowerCase();
 
-        const manager = new THREE.LoadingManager();
+        // UI Flush for heavy models
+        setLoading(true);
+        if (file.size > 50 * 1024 * 1024) {
+            setUploadStatus("Cargando modelo pesado... (Esto puede congelar el navegador unos segundos)");
+        } else {
+            setUploadStatus("Renderizando...");
+        }
+
+        // Force UI Repaint
+        setTimeout(() => {
+            const manager = new THREE.LoadingManager();
+
+            // Wrap execution in a macro-task to allow the setUploadStatus to render
+            executeLoad(manager, url, ext, file, allFiles);
+        }, 100);
+    };
+
+    const executeLoad = (manager, url, ext, file, allFiles) => {
         manager.addHandler(/\.tga$/i, new TGALoader()); // Enable TGA support
 
         manager.setURLModifier(url => {
@@ -1164,7 +1185,7 @@ function Converter() {
                                 <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                 <span className="sm:hidden">Toolkit</span>
                                 <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                    v3.17.16
+                                    v3.17.17
                                 </span>
                             </h1>
                         </div>
