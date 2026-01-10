@@ -33,7 +33,6 @@ import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { Download as DownloadIcon, FileBox, FileCode, Smartphone, Box, AlertTriangle, Check, Layers, Monitor, HardDrive } from 'lucide-react';
 
 import { Badge } from "@/components/ui/badge.jsx";
-import { Badge } from "@/components/ui/badge.jsx";
 import { Card, CardContent } from "@/components/ui/card.jsx";
 import { APP_VERSION } from "@/components/VersionManager";
 
