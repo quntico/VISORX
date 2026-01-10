@@ -965,26 +965,81 @@ function Converter() {
     const handleLoadModel = (m) => {
         if (!m.file_url) return;
         setLoading(true);
+        setLoadError(null);
+        setUploadStatus("Iniciando descarga...");
+
         // Simple load from URL
         const filename = m.file_name || m.file_path || m.file_url || "";
         const ext = filename.split('.').pop().toLowerCase();
         const url = m.file_url;
 
         const manager = new THREE.LoadingManager();
-        const onLoad = (obj) => {
-            if (modelObject) sceneRef.current.remove(modelObject);
-            const final = obj.scene || obj;
-            sceneRef.current.add(final);
-            setModelObject(final);
-            fitModelToView(final);
-            setLoading(false);
-            setSaveData({ name: m.name, projectId: m.project_id });
+
+        // Loader Progress
+        const onProgress = (xhr) => {
+            if (xhr.lengthComputable) {
+                const percent = Math.round((xhr.loaded / xhr.total) * 100);
+                setUploadStatus(`Descargando: ${percent}%`);
+                if (percent >= 100) {
+                    setUploadStatus("Procesando geometría (esto puede congelar la pantalla)...");
+                }
+            } else {
+                const mb = (xhr.loaded / 1024 / 1024).toFixed(2);
+                setUploadStatus(`Descargando: ${mb} MB`);
+            }
         };
 
-        if (ext === 'fbx') new FBXLoader(manager).load(url, onLoad);
-        else if (ext === 'obj') new OBJLoader(manager).load(url, onLoad);
-        else if (ext === 'dae') new ColladaLoader(manager).load(url, onLoad);
-        else new GLTFLoader(manager).load(url, onLoad);
+        const onLoad = (obj) => {
+            try {
+                if (modelObject) {
+                    sceneRef.current.remove(modelObject);
+                    // Dispose old model resources if possible to free memory
+                    modelObject.traverse((child) => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                            else child.material.dispose();
+                        }
+                    });
+                }
+
+                const final = obj.scene || obj;
+                sceneRef.current.add(final);
+                setModelObject(final);
+                fitModelToView(final);
+
+                setLoading(false);
+                setUploadStatus("");
+                setSaveData({ name: m.name, projectId: m.project_id });
+                toast({ title: "Modelo cargado", description: m.name });
+            } catch (e) {
+                console.error("Render Error:", e);
+                setLoadError(`Error de renderizado: ${e.message}`);
+                setLoading(false);
+            }
+        };
+
+        const onError = (err) => {
+            console.error("Load Error:", err);
+            setLoading(false);
+            setUploadStatus("");
+
+            // Extract meaningful error
+            let msg = err.message || "Fallo de red o archivo corrupto";
+            if (err.target && err.target.status) msg = `HTTP ${err.target.status}`;
+
+            setLoadError(`Error al cargar ${ext.toUpperCase()}: ${msg}`);
+            toast({ title: "Error", description: "No se pudo cargar el modelo.", variant: "destructive" });
+        };
+
+        try {
+            if (ext === 'fbx') new FBXLoader(manager).load(url, onLoad, onProgress, onError);
+            else if (ext === 'obj') new OBJLoader(manager).load(url, onLoad, onProgress, onError);
+            else if (ext === 'dae') new ColladaLoader(manager).load(url, onLoad, onProgress, onError);
+            else new GLTFLoader(manager).load(url, onLoad, onProgress, onError);
+        } catch (e) {
+            onError(e);
+        }
     };
 
     // ==================== RENDERING ====================
