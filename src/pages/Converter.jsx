@@ -2,15 +2,15 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon, Loader2, RotateCw, AlertCircle, Camera, BookOpen, Trash2, RefreshCw, Play, Pause, MoveVertical, Activity, Video, Download, CornerUpLeft, CornerUpRight, ArrowUp, ArrowDown, ArrowRight, VideoOff } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button.jsx';
+import { Slider } from '@/components/ui/slider.jsx';
+import { Switch } from '@/components/ui/switch.jsx';
+import { useToast } from '@/components/ui/use-toast.js';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { listProjects, saveModelFlow, uploadModelToCloud } from '@/lib/data-service';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.jsx";
 import {
     Dialog,
     DialogContent,
@@ -18,7 +18,7 @@ import {
     DialogTitle,
     DialogDescription,
     DialogFooter
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog.jsx";
 
 // THREE JS IMPORTS
 import * as THREE from 'three';
@@ -39,8 +39,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { Download as DownloadIcon, FileBox, FileCode, Smartphone, Box, AlertTriangle, Check, Layers, Monitor, HardDrive } from 'lucide-react';
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge.jsx";
+import { Card, CardContent } from "@/components/ui/card.jsx";
 
 
 // ==================== VIRTUAL JOYSTICK ====================
