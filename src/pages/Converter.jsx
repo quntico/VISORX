@@ -38,7 +38,7 @@ import { QRCodeSVG } from 'qrcode.react';
 // NEW IMPORTS FOR DOWNLOADS
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { Download as DownloadIcon, FileBox, FileCode, Smartphone, Box, AlertTriangle, Check, Layers, Monitor, HardDrive } from 'lucide-react';
-import { Progress } from "@/components/ui/progress";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
