@@ -33,7 +33,9 @@ import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { Download as DownloadIcon, FileBox, FileCode, Smartphone, Box, AlertTriangle, Check, Layers, Monitor, HardDrive } from 'lucide-react';
 
 import { Badge } from "@/components/ui/badge.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
 import { Card, CardContent } from "@/components/ui/card.jsx";
+import { APP_VERSION } from "@/components/VersionManager";
 
 
 // ==================== VIRTUAL JOYSTICK ====================
@@ -1233,7 +1235,7 @@ function Converter() {
                                 <span className="hidden sm:inline">Toolkit & Convertidor</span>
                                 <span className="sm:hidden">Toolkit</span>
                                 <span className="bg-[#29B6F6] text-black text-[10px] px-2 py-0.5 rounded font-bold font-mono shadow-[0_0_10px_rgba(41,182,246,0.5)]">
-                                    v3.17.17
+                                    {APP_VERSION}
                                 </span>
                             </h1>
                         </div>

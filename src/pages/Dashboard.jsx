@@ -10,6 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import CreateProjectDialog from '@/components/CreateProjectDialog';
 import { listProjects, createProject } from '@/lib/data-service';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { APP_VERSION } from '@/components/VersionManager';
 
 function Dashboard() {
   const { user, role, signOut } = useAuth();
@@ -159,7 +160,7 @@ function Dashboard() {
                 <Cube className="h-8 w-8 text-[#29B6F6]" />
                 <div>
                   <h1 className="text-xl font-bold text-white">VISOR-X</h1>
-                  <span className="text-[10px] text-[#29B6F6] font-mono bg-[#29B6F6]/10 px-1.5 py-0.5 rounded border border-[#29B6F6]/20">v3.17.17</span>
+                  <span className="text-[10px] text-[#29B6F6] font-mono bg-[#29B6F6]/10 px-1.5 py-0.5 rounded border border-[#29B6F6]/20">{APP_VERSION}</span>
                 </div>
               </div>
               <div className="flex items-center gap-4">
