@@ -1487,7 +1487,7 @@ function Converter() {
                         disabled={!modelObject}
                         className="whitespace-nowrap"
                     >
-                        <DownloadIcon className="h-4 w-4 mr-2" /> Descargar
+                        <Download className="h-4 w-4 mr-2" /> Descargar
                     </Button>
                     <Button size="sm" onClick={() => setShowSaveDialog(true)} disabled={!modelObject && !modelFile} className="whitespace-nowrap">
                         <Save className="h-4 w-4 mr-2" /> Guardar
