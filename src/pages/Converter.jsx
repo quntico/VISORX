@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon,
     Loader2, RotateCw, AlertCircle, Camera, BookOpen, Trash2, RefreshCw,
-    Play, Pause, MoveVertical, Activity, Video, Download, CornerUpLeft,
+    Home, Play, Pause, MoveVertical, Activity, Video, Download, CornerUpLeft,
     CornerUpRight, ArrowUp, ArrowDown, ArrowRight, VideoOff,
     FileBox, FileCode, Smartphone, Box, AlertTriangle, Check, Layers, Monitor, HardDrive
 } from 'lucide-react';
