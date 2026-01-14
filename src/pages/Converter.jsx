@@ -1,7 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon, Loader2, RotateCw, AlertCircle, Camera, BookOpen, Trash2, RefreshCw, Play, Pause, MoveVertical, Activity, Video, Download, CornerUpLeft, CornerUpRight, ArrowUp, ArrowDown, ArrowRight, VideoOff } from 'lucide-react';
+import {
+    ArrowLeft, Upload, Save, ZoomIn, ZoomOut, Image as ImageIcon, Box as BoxIcon,
+    Loader2, RotateCw, AlertCircle, Camera, BookOpen, Trash2, RefreshCw,
+    Play, Pause, MoveVertical, Activity, Video, Download, CornerUpLeft,
+    CornerUpRight, ArrowUp, ArrowDown, ArrowRight, VideoOff,
+    FileBox, FileCode, Smartphone, Box, AlertTriangle, Check, Layers, Monitor, HardDrive
+} from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Slider } from '@/components/ui/slider.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
@@ -30,7 +36,6 @@ import { QRCodeSVG } from 'qrcode.react';
 
 // NEW IMPORTS FOR DOWNLOADS
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
-import { Download as DownloadIcon, FileBox, FileCode, Smartphone, Box, AlertTriangle, Check, Layers, Monitor, HardDrive } from 'lucide-react';
 
 import { Badge } from "@/components/ui/badge.jsx";
 import { Card, CardContent } from "@/components/ui/card.jsx";
@@ -201,7 +206,7 @@ const DownloadsDialog = ({ open, onOpenChange, modelObject, onDownload }) => {
             desc: "Original Format",
             ext: ".obj",
             color: "text-blue-400",
-            icon: <Box className="w-5 h-5" />,
+            icon: <BoxIcon className="w-5 h-5" />,
             options: [
                 { id: "original", label: "Original" } // OBJ usually doesn't need resize unless textures are exported too, we'll keep simple for now
             ]
@@ -237,7 +242,7 @@ const DownloadsDialog = ({ open, onOpenChange, modelObject, onDownload }) => {
             desc: "Binary / Standard",
             ext: ".glb",
             color: "text-green-400",
-            icon: <Box className="w-5 h-5" />,
+            icon: <BoxIcon className="w-5 h-5" />,
             options: [
                 { id: "4k", label: "4K" },
                 { id: "2k", label: "2K" },
@@ -279,7 +284,7 @@ const DownloadsDialog = ({ open, onOpenChange, modelObject, onDownload }) => {
                                             </Badge>
                                             <div className="flex flex-col">
                                                 <span className="text-sm font-medium text-gray-200">
-                                                    {opt.label === 'Original' ? 'Original Source' : `Texture size: ${opt.label}`}
+                                                    {(opt.label === 'Original' ? 'Original Source' : `Texture size: ${opt.label}`) || "Default"}
                                                 </span>
                                                 {/* Mock size estimation could go here */}
                                             </div>
@@ -620,8 +625,12 @@ function Converter() {
 
                 // Dedup textures
                 const uniqueTextures = [...new Set(textures)];
-                uniqueTextures.forEach(tex => {
+                console.log(`Export: Processing ${uniqueTextures.length} textures...`);
+
+                for (let i = 0; i < uniqueTextures.length; i++) {
+                    const tex = uniqueTextures[i];
                     const resized = resizeTexture(tex, maxSize);
+
                     // Replace in materials
                     exportModel.traverse(child => {
                         if (child.isMesh && child.material) {
@@ -633,7 +642,13 @@ function Converter() {
                             });
                         }
                     });
-                });
+
+                    // Yield every 5 textures to avoid blocking main thread on mobile
+                    if (i % 5 === 0) {
+                        setUploadStatus(`Optimizing: ${Math.round((i / uniqueTextures.length) * 100)}%`);
+                        await new Promise(r => setTimeout(r, 20));
+                    }
+                }
             }
 
             // 3. EXPORT SWITCH
@@ -1114,7 +1129,7 @@ function Converter() {
         }
 
         // Center model
-        object.position.sub(center);
+        if (object) object.position.sub(center);
 
         if (controlsRef.current && cameraRef.current) {
             const maxDim = Math.max(size.x, size.y, size.z) || 5; // Default to 5 if 0
@@ -1190,14 +1205,14 @@ function Converter() {
                 }
 
                 const final = obj.scene || obj;
-                sceneRef.current.add(final);
+                if (sceneRef.current) sceneRef.current.add(final);
                 setModelObject(final);
                 fitModelToView(final);
 
                 setLoading(false);
                 setUploadStatus("");
-                setSaveData({ name: m.name, projectId: m.project_id });
-                toast({ title: "Modelo cargado", description: m.name });
+                setSaveData({ name: m.name || "", projectId: m.project_id || "" });
+                toast({ title: "Modelo cargado", description: m.name || "Sin nombre" });
             } catch (e) {
                 console.error("Render Error:", e);
                 setLoadError(`Error de renderizado: ${e.message}`);
