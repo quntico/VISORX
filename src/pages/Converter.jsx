@@ -767,7 +767,7 @@ function Converter() {
     const prepareModelForAR = async (originalModel) => {
         if (!originalModel) return null;
 
-        console.log("AR: Optimizando modelo (Geometría + Texturas)...");
+        console.log("AR: Iniciando Optimización Robusta (v3.17.34)...");
         const arModel = originalModel.clone();
 
         // 1. SANITIZE: Remove non-Mesh, non-Group objects (Lines, Points, Lights, Cameras)
@@ -776,14 +776,16 @@ function Converter() {
             if (child.isLine || child.isPoints || child.isLight || child.isCamera || child.isHelper) {
                 toRemove.push(child);
             }
+            // Ensure valid names for USDZ nodes
+            if (!child.name) child.name = `node_${child.uuid.slice(0, 8)}`;
         });
         toRemove.forEach(child => {
             if (child.parent) child.parent.remove(child);
         });
 
-        // 2. NORMALIZE SCALE & POSITION (WRAPPER STRATEGY)
-        // We use a wrapper group to safely transform centering/scaling without messing up internal matrices
+        // 2. NORMALIZE SCALE & POSITION (ADVANCED WRAPPER)
         const wrapper = new THREE.Group();
+        wrapper.name = "AR_Wrapper";
         wrapper.add(arModel);
 
         const box = new THREE.Box3().setFromObject(arModel);
@@ -791,56 +793,56 @@ function Converter() {
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
 
-            // 1. Center the model object INSIDE the wrapper so it sits on 0,0,0
-            // We shift it so:
-            // X = -center.x (Center horizontally)
-            // Y = -box.min.y (Sit ON TOP of the floor, not halfway through)
-            // Z = -center.z (Center depth)
+            console.log("AR: Dimensiones originales:", {
+                x: size.x.toFixed(2),
+                y: size.y.toFixed(2),
+                z: size.z.toFixed(2)
+            });
+
+            // Center the inner model relative to wrapper (0,0,0)
+            // Sit it on the floor (Y starts at 0)
             arModel.position.set(-center.x, -box.min.y, -center.z);
 
-            // 2. Scale the WRAPPER to represent ~1 meter real world size
+            // Scale logic: Target 0.8m - 1.0m
             const maxDim = Math.max(size.x, size.y, size.z);
             if (maxDim > 0) {
-                // Target size: 0.8 meters (fits nicely on a table)
                 const targetSize = 0.8;
                 const scale = targetSize / maxDim;
-                wrapper.scale.set(scale, scale, scale);
+                console.log(`AR: Aplicando escala de ${scale.toFixed(4)} para ajustar a ${targetSize}m`);
+
+                // CRITICAL: We apply scale to the MODEL, not the wrapper, for USDZ compatibility
+                arModel.scale.set(scale, scale, scale);
+                // Also adjust position since we scaled the child
+                arModel.position.multiplyScalar(scale);
             }
         }
 
-        // Ensure Wrapper updates
+        // Final updates
         wrapper.updateMatrixWorld(true);
 
-        // Point arModel reference to wrapper for next steps (Texture processing traverses children anyway)
-        const finalExportObject = wrapper;
-
         // 3. OPTIMIZE TEXTURES & MATERIALS
-        // Use 1024 for AR (Sweet spot for mobile quality vs perf)
         const MAX_AR_TEXTURE_SIZE = 1024;
         const processedTextures = new Map();
 
-        finalExportObject.traverse((child) => {
+        wrapper.traverse((child) => {
             if (child.isMesh && child.material) {
                 const materials = Array.isArray(child.material) ? child.material : [child.material];
 
-                // Convert to Standard Material if complex (Physical, etc) to ensure compatibility
-                const newMaterials = materials.map(mat => {
+                materials.forEach(mat => {
+                    // SAFE MATERIALS FOR QUICK LOOK
+                    mat.side = THREE.DoubleSide; // Avoid invisibility from backface culling
+
                     // Reduce transmission/clearcoat which kills usage on iOS
                     if (mat.transmission > 0 || mat.clearcoat > 0) {
                         mat.transmission = 0;
                         mat.clearcoat = 0;
-                        mat.opacity = 0.9; // Flatten opacity issues
-                        mat.transparent = false; // Force Opaque if possible
+                        mat.opacity = Math.max(mat.opacity, 0.8);
+                        mat.transparent = mat.opacity < 1;
                     }
-                    return mat;
-                });
 
-                if (Array.isArray(child.material)) child.material = newMaterials;
-
-                newMaterials.forEach(mat => {
+                    // Texture Resize Phase
                     ['map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'normalMap', 'aoMap', 'alphaMap'].forEach(key => {
                         if (mat[key] && mat[key].image) {
-                            // Check cache to avoid resizing same texture multiple times
                             if (processedTextures.has(mat[key].uuid)) {
                                 mat[key] = processedTextures.get(mat[key].uuid);
                             } else {
@@ -858,9 +860,9 @@ function Converter() {
             }
         });
 
-        // Small yield to let UI update
-        await new Promise(r => setTimeout(r, 50));
-        return finalExportObject;
+        await new Promise(r => setTimeout(r, 100)); // UI Breath
+        console.log("AR: Optimización completada.");
+        return wrapper;
     };
 
 
