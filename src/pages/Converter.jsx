@@ -842,57 +842,25 @@ function Converter() {
         // Final updates
         wrapper.updateMatrixWorld(true);
 
-        // 3. OPTIMIZE TEXTURES & MATERIALS
-        const MAX_AR_TEXTURE_SIZE = 1024;
-        const processedTextures = new Map();
-
+        // 3. FORCE WATERMARK MODE (WIREFRRAME + TRANSPARENT)
+        // This makes the model ultra-light for Quick Look
         wrapper.traverse((child) => {
-            if (child.isMesh && child.material) {
-                const materials = Array.isArray(child.material) ? child.material : [child.material];
+            if (child.isMesh) {
+                // Ensure double sided for visibility
+                const color = child.material.color ? child.material.color.clone() : new THREE.Color(0x888888);
 
-                materials.forEach(mat => {
-                    // SAFE MATERIALS FOR QUICK LOOK + VISIBILITY REINFORCEMENT
-                    mat.side = THREE.DoubleSide; // Avoid invisibility from backface culling
-                    mat.shadowSide = THREE.DoubleSide;
-
-                    // Force opacity to be reliable
-                    if (mat.opacity < 0.1) mat.opacity = 1;
-
-                    // Boost opacity for visibility
-                    mat.opacity = Math.max(mat.opacity, 0.9);
-                    mat.transparent = mat.opacity < 1;
-
-                    // Kill metallic/roughness if they might be causing issues on some iOS versions
-                    // mat.metalness = Math.min(mat.metalness, 0.5); 
-                    // mat.roughness = Math.max(mat.roughness, 0.2);
-
-                    // Reduce transmission/clearcoat/sheen which are problematic in USDZ
-                    if (mat.transmission !== undefined) mat.transmission = 0;
-                    if (mat.clearcoat !== undefined) mat.clearcoat = 0;
-                    if (mat.sheen !== undefined) mat.sheen = 0;
-                    if (mat.thickness !== undefined) mat.thickness = 0;
-
-                    // Texture Resize Phase
-                    ['map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'normalMap', 'aoMap', 'alphaMap'].forEach(key => {
-                        if (mat[key] && mat[key].image) {
-                            if (processedTextures.has(mat[key].uuid)) {
-                                mat[key] = processedTextures.get(mat[key].uuid);
-                            } else {
-                                try {
-                                    const resized = resizeTexture(mat[key], MAX_AR_TEXTURE_SIZE);
-                                    processedTextures.set(mat[key].uuid, resized);
-                                    mat[key] = resized;
-                                } catch (e) {
-                                    console.warn("AR: Texture resize failed for", key, e);
-                                }
-                            }
-                        }
-                    });
+                child.material = new THREE.MeshBasicMaterial({
+                    color: color,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.5,
+                    side: THREE.DoubleSide
                 });
             }
         });
 
-        await new Promise(r => setTimeout(r, 100)); // UI Breath
+        // 4. FINAL UPDATES
+        wrapper.updateMatrixWorld(true);
         console.log("AR: Optimización completada.");
         return wrapper;
     };
