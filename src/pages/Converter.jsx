@@ -717,7 +717,8 @@ function Converter() {
     };
 
     // ==================== OLD GENERATE GLB (Kept for compatibility) ====================
-    const generateGLB = async () => {
+    // ==================== OLD GENERATE GLB (Kept for compatibility) ====================
+    const generateGLB = async (modelOverride = null) => {
 
         const parseGLB = (obj) => {
             return new Promise((resolve, reject) => {
@@ -738,12 +739,15 @@ function Converter() {
             });
         };
 
-        if (!modelObject) throw new Error("No model loaded");
+        const target = modelOverride || modelObject;
+        if (!target) throw new Error("No model loaded");
+
         try {
-            return await parseGLB(modelObject);
+            return await parseGLB(target);
         } catch (error) {
             console.warn("Standard export failed, attempting geometry-only export...", error);
-            const safeObj = modelObject.clone();
+            // If override provided, clone that, else clone global
+            const safeObj = target.clone();
             safeObj.traverse((child) => {
                 if (child.isMesh) {
                     child.material = child.material.clone();
@@ -759,11 +763,56 @@ function Converter() {
     const [showArDialog, setShowArDialog] = useState(false);
     const [arUrls, setArUrls] = useState({ usdz: null, glb: null });
 
-    const generateUSDZ = async () => {
+    // Helper: Optimize Model for AR (Reduce Texture Size)
+    const prepareModelForAR = async (originalModel) => {
+        if (!originalModel) return null;
+
+        console.log("AR: Optimizando modelo...");
+        const arModel = originalModel.clone();
+
+        // Use 1024 for AR (Sweet spot for mobile quality vs perf)
+        const MAX_AR_TEXTURE_SIZE = 1024;
+
+        const processedTextures = new Map();
+
+        arModel.traverse((child) => {
+            if (child.isMesh && child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+
+                materials.forEach(mat => {
+                    ['map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'normalMap', 'aoMap', 'alphaMap'].forEach(key => {
+                        if (mat[key] && mat[key].image) {
+                            // Check cache to avoid resizing same texture multiple times
+                            if (processedTextures.has(mat[key].uuid)) {
+                                mat[key] = processedTextures.get(mat[key].uuid);
+                            } else {
+                                try {
+                                    const resized = resizeTexture(mat[key], MAX_AR_TEXTURE_SIZE);
+                                    processedTextures.set(mat[key].uuid, resized);
+                                    mat[key] = resized;
+                                } catch (e) {
+                                    console.warn("AR: Texture resize failed for", key, e);
+                                }
+                            }
+                        }
+                    });
+                });
+            }
+        });
+
+        // Small yield to let UI update
+        await new Promise(r => setTimeout(r, 50));
+        return arModel;
+    };
+
+
+    const generateUSDZ = async (modelToExport) => {
         return new Promise((resolve, reject) => {
-            if (!modelObject) return reject("No model");
+            const finalModel = modelToExport || modelObject;
+            if (!finalModel) return reject("No model");
+
             const exporter = new USDZExporter();
-            exporter.parse(modelObject, (usdz) => {
+            exporter.parse(finalModel, (usdz) => {
                 const blob = new Blob([usdz], { type: 'application/octet-stream' });
                 resolve(blob);
             }, { quickLookCompatible: true });
@@ -781,11 +830,20 @@ function Converter() {
         try {
             console.log("AR: Iniciando generación de archivos...");
 
+            // 0. OPTIMIZE MODEL
+            setUploadStatus("Optimizando texturas para móvil...");
+            const optimizedModel = await prepareModelForAR(modelObject);
+
             // 1. Generate GLB (Android)
             let glbUrl = null;
             try {
                 setUploadStatus("Generando para Android (GLB)...");
-                const glbBlob = await generateGLB();
+                // Note: generateGLB currently uses modelObject globally or passed arg?
+                // We need to modify generateGLB to accept an argument or use a temp state.
+                // Let's modify generateGLB below to accept an optional object.
+
+                // Temporary fix: We need a generateGLB that accepts the object
+                const glbBlob = await generateGLB(optimizedModel);
                 glbUrl = URL.createObjectURL(glbBlob);
                 console.log("AR: GLB generado correctamente size=", glbBlob.size);
             } catch (err) {
@@ -797,7 +855,7 @@ function Converter() {
             let usdzUrl = null;
             try {
                 setUploadStatus("Generando para iOS (USDZ)...");
-                const usdzBlob = await generateUSDZ();
+                const usdzBlob = await generateUSDZ(optimizedModel);
                 usdzUrl = URL.createObjectURL(usdzBlob);
                 console.log("AR: USDZ generado correctamente size=", usdzBlob.size);
             } catch (err) {
