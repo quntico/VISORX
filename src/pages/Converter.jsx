@@ -842,27 +842,41 @@ function Converter() {
         // Final updates
         wrapper.updateMatrixWorld(true);
 
-        // 3. FORCE WATERMARK MODE (WIREFRRAME + TRANSPARENT)
-        // This makes the model ultra-light for Quick Look
-        wrapper.traverse((child) => {
-            if (child.isMesh) {
-                // Ensure double sided for visibility
-                const color = child.material.color ? child.material.color.clone() : new THREE.Color(0x888888);
+        // 3. FLATTEN HIERARCHY & STANDARDIZE MATERIALS (AR REINFORCEMENT)
+        // QuickLook hates deep nesting and BasicMaterial.
+        const flatGroup = new THREE.Group();
+        flatGroup.name = "AR_Root";
 
-                child.material = new THREE.MeshBasicMaterial({
-                    color: color,
-                    wireframe: true,
+        wrapper.updateMatrixWorld(true);
+        const meshes = [];
+        wrapper.traverse((child) => {
+            if (child.isMesh && child.geometry) {
+                const clone = child.clone();
+                // Apply world matrix to geometry to flatten the hierarchy
+                clone.geometry = child.geometry.clone();
+                clone.geometry.applyMatrix4(child.matrixWorld);
+
+                // Use StandardMaterial (Apple's favorite) but as a "Watermark"
+                clone.material = new THREE.MeshStandardMaterial({
+                    color: child.material.color ? child.material.color.clone() : 0x888888,
                     transparent: true,
                     opacity: 0.5,
+                    metalness: 0,
+                    roughness: 1,
                     side: THREE.DoubleSide
                 });
+
+                clone.position.set(0, 0, 0);
+                clone.rotation.set(0, 0, 0);
+                clone.scale.set(1, 1, 1);
+                meshes.push(clone);
             }
         });
 
-        // 4. FINAL UPDATES
-        wrapper.updateMatrixWorld(true);
-        console.log("AR: Optimización completada.");
-        return wrapper;
+        meshes.forEach(m => flatGroup.add(m));
+
+        console.log(`AR: Jerarquía aplanada (${meshes.length} mallas).`);
+        return flatGroup;
     };
 
 
@@ -873,7 +887,7 @@ function Converter() {
 
             const exporter = new USDZExporter();
             exporter.parse(finalModel, (usdz) => {
-                const blob = new Blob([usdz], { type: 'application/octet-stream' });
+                const blob = new Blob([usdz], { type: 'model/vnd.usdz+zip' });
                 resolve(blob);
             }, { quickLookCompatible: true });
         });
