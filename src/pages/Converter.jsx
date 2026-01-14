@@ -810,6 +810,7 @@ function Converter() {
         arModel.rotation.set(0, rotation, 0); // Apply current web rotation
         wrapper.add(arModel);
 
+        wrapper.updateMatrixWorld(true); // CRITICAL: Update before box calc
         const box = new THREE.Box3().setFromObject(arModel);
         if (!box.isEmpty()) {
             const size = box.getSize(new THREE.Vector3());
@@ -1111,6 +1112,10 @@ function Converter() {
 
     // View Utils
     const fitModelToView = (object) => {
+        if (!object) return;
+
+        // Force internal matrix update before computing bounds
+        object.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(object);
 
         if (box.isEmpty()) {
@@ -1128,23 +1133,26 @@ function Converter() {
             return;
         }
 
-        // Center model
-        if (object) object.position.sub(center);
+        // Center model geometry relative to its local origin
+        // This ensures the object rotates around its center and is centered on the grid
+        if (object) {
+            object.position.set(0, 0, 0); // Reset position before any sub
+            object.position.sub(center);
+        }
 
         if (controlsRef.current && cameraRef.current) {
-            const maxDim = Math.max(size.x, size.y, size.z) || 5; // Default to 5 if 0
-            const dist = maxDim * 2.5; // Slightly further back
+            const maxDim = Math.max(size.x, size.y, size.z) || 5;
+            const dist = maxDim * 2.2; // Optimized distance
 
-            // Adjust Clipping Planes for Giant/Micro models
-            cameraRef.current.near = maxDim / 1000;
-            cameraRef.current.far = maxDim * 100;
+            // Reset controls to focus on the origin (where we moved the model's center)
+            controlsRef.current.target.set(0, 0, 0);
+
+            // Set camera position
+            cameraRef.current.position.set(dist, dist, dist);
+            cameraRef.current.near = Math.max(0.01, maxDim / 1000);
+            cameraRef.current.far = Math.max(100000, maxDim * 20);
             cameraRef.current.updateProjectionMatrix();
 
-            cameraRef.current.position.set(dist, dist, dist);
-
-            controlsRef.current.target.set(0, 0, 0);
-            controlsRef.current.maxDistance = maxDim * 10;
-            controlsRef.current.minDistance = maxDim / 50;
             controlsRef.current.update();
 
             console.log("Comprobación de Cámara:", { maxDim, dist, near: cameraRef.current.near, far: cameraRef.current.far });
@@ -1255,8 +1263,8 @@ function Converter() {
         scene.background = new THREE.Color(0x151b23);
         sceneRef.current = scene;
 
-        const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
-        camera.position.set(5, 5, 5);
+        const camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 100000);
+        camera.position.set(20, 20, 20);
         cameraRef.current = camera;
 
         // Initialize Renderer with Error Handling
@@ -1292,10 +1300,10 @@ function Converter() {
 
         // Lights
         scene.add(new THREE.AmbientLight(0xffffff, 1));
-        const dir = new THREE.DirectionalLight(0xffffff, 2);
-        dir.position.set(5, 10, 5);
+        const dir = new THREE.DirectionalLight(0xffffff, 2.5); // Boosted
+        dir.position.set(50, 100, 50);
         scene.add(dir);
-        scene.add(new THREE.GridHelper(20, 20));
+        scene.add(new THREE.GridHelper(2000, 200, 0x444444, 0x222222)); // Industrial scale grid
 
         // Animation Loop
         let animationId;
