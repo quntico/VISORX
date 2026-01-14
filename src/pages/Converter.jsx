@@ -781,35 +781,45 @@ function Converter() {
             if (child.parent) child.parent.remove(child);
         });
 
-        // 2. NORMALIZE SCALE & POSITION
+        // 2. NORMALIZE SCALE & POSITION (WRAPPER STRATEGY)
+        // We use a wrapper group to safely transform centering/scaling without messing up internal matrices
+        const wrapper = new THREE.Group();
+        wrapper.add(arModel);
+
         const box = new THREE.Box3().setFromObject(arModel);
         if (!box.isEmpty()) {
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
 
-            // Center at 0,0,0
-            arModel.position.x -= center.x;
-            arModel.position.y -= center.y;
-            arModel.position.z -= center.z;
+            // 1. Center the model object INSIDE the wrapper so it sits on 0,0,0
+            // We shift it so:
+            // X = -center.x (Center horizontally)
+            // Y = -box.min.y (Sit ON TOP of the floor, not halfway through)
+            // Z = -center.z (Center depth)
+            arModel.position.set(-center.x, -box.min.y, -center.z);
 
-            // Scale to fit in ~1 meter cube (AR Friendly)
+            // 2. Scale the WRAPPER to represent ~1 meter real world size
             const maxDim = Math.max(size.x, size.y, size.z);
             if (maxDim > 0) {
-                const targetSize = 1.0; // 1 Meter
+                // Target size: 0.8 meters (fits nicely on a table)
+                const targetSize = 0.8;
                 const scale = targetSize / maxDim;
-                arModel.scale.set(scale, scale, scale);
-                // Reset rotation
-                arModel.rotation.set(0, 0, 0);
-                arModel.updateMatrixWorld(true);
+                wrapper.scale.set(scale, scale, scale);
             }
         }
+
+        // Ensure Wrapper updates
+        wrapper.updateMatrixWorld(true);
+
+        // Point arModel reference to wrapper for next steps (Texture processing traverses children anyway)
+        const finalExportObject = wrapper;
 
         // 3. OPTIMIZE TEXTURES & MATERIALS
         // Use 1024 for AR (Sweet spot for mobile quality vs perf)
         const MAX_AR_TEXTURE_SIZE = 1024;
         const processedTextures = new Map();
 
-        arModel.traverse((child) => {
+        finalExportObject.traverse((child) => {
             if (child.isMesh && child.material) {
                 const materials = Array.isArray(child.material) ? child.material : [child.material];
 
@@ -850,7 +860,7 @@ function Converter() {
 
         // Small yield to let UI update
         await new Promise(r => setTimeout(r, 50));
-        return arModel;
+        return finalExportObject;
     };
 
 
