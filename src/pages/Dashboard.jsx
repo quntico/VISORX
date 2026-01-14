@@ -11,6 +11,14 @@ import CreateProjectDialog from '@/components/CreateProjectDialog';
 import { listProjects, createProject } from '@/lib/data-service';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { APP_VERSION } from '@/components/VersionManager';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 function Dashboard() {
   const { user, role, signOut } = useAuth();
@@ -21,6 +29,7 @@ function Dashboard() {
   // Use local state for now, NO FETCHING yet
   const [projects, setProjects] = useState([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [selectedErrorProject, setSelectedErrorProject] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // DEBUG STATE
@@ -257,8 +266,17 @@ function Dashboard() {
               {projects.map((project, index) => (
                 <div
                   key={project.id}
-                  onClick={() => navigate(`/project/${project.id}`)}
-                  className="bg-[#151B23] border border-[#29B6F6]/10 rounded-lg p-6 hover:border-[#29B6F6]/40 transition-all cursor-pointer group hover:bg-[#1c222b]"
+                  onClick={() => {
+                    if (project.status === 'error') {
+                      setSelectedErrorProject(project);
+                    } else {
+                      navigate(`/project/${project.id}`);
+                    }
+                  }}
+                  className={`bg-[#151B23] border rounded-lg p-6 transition-all cursor-pointer group hover:bg-[#1c222b] ${project.status === 'error'
+                      ? 'border-red-500/30 hover:border-red-500/50'
+                      : 'border-[#29B6F6]/10 hover:border-[#29B6F6]/40'
+                    }`}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div className="p-2 bg-blue-500/10 rounded-md">
@@ -295,6 +313,34 @@ function Dashboard() {
           onOpenChange={setShowCreateDialog}
           onSubmit={handleCreateProject}
         />
+
+        <Dialog open={!!selectedErrorProject} onOpenChange={(open) => !open && setSelectedErrorProject(null)}>
+          <DialogContent className="bg-[#1c2430] border-red-500/20 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-red-400 flex items-center gap-2">
+                <InfoIcon className="w-5 h-5" />
+                Error del Proyecto
+              </DialogTitle>
+              <DialogDescription className="text-gray-300">
+                Este proyecto no se pudo crear correctamente.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="bg-black/40 p-4 rounded-md border border-white/5 font-mono text-xs text-red-300 overflow-auto max-h-[200px]">
+              {selectedErrorProject?.last_error || "Error desconocido. Por favor intenta crear el proyecto nuevamente."}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setSelectedErrorProject(null)}
+                className="hover:bg-white/10 hover:text-white"
+              >
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
 
       </div>

@@ -1,0 +1,9 @@
+node_modules
+.vercel
+dist
+modelos 1.1
+proyectos para visor X
+*.zip
+*.obj
+*.fbx
+*.glb

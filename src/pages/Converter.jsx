@@ -75,7 +75,7 @@ const Joystick = ({ onMove }) => {
 
     return (
         <div
-            className="absolute bottom-32 right-8 w-24 h-24 bg-white/10 backdrop-blur-md rounded-full border-2 border-white/20 flex items-center justify-center touch-none sm:hidden z-50 shadow-[0_0_20px_rgba(0,255,255,0.2)]"
+            className="absolute bottom-32 right-8 w-24 h-24 bg-white/10 backdrop-blur-md rounded-full border-2 border-white/20 flex items-center justify-center touch-none lg:hidden z-50 shadow-[0_0_20px_rgba(0,255,255,0.2)]"
             onTouchStart={handleStart}
             onTouchMove={handleMove}
             onTouchEnd={handleEnd}
@@ -102,7 +102,7 @@ const DPad = ({ onMove }) => {
     const btnClass = "w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center active:bg-cyan-500/50 transition-colors touch-none user-select-none";
 
     return (
-        <div className="absolute bottom-32 left-8 w-32 h-32 touch-none sm:hidden z-50 grid grid-cols-3 grid-rows-3 gap-1 shadow-[0_0_20px_rgba(0,0,0,0.3)] bg-black/20 rounded-full p-1 transform rotate-45">
+        <div className="absolute bottom-32 left-8 w-32 h-32 touch-none lg:hidden z-50 grid grid-cols-3 grid-rows-3 gap-1 shadow-[0_0_20px_rgba(0,0,0,0.3)] bg-black/20 rounded-full p-1 transform rotate-45">
             <div className="transform -rotate-45" /> {/* Corner */}
             <div className={`${btnClass} transform -rotate-45`} onTouchStart={(e) => { e.preventDefault(); start({ z: -0.1 }) }} onTouchEnd={stop} onContextMenu={e => e.preventDefault()}>
                 <ArrowUp className="w-6 h-6 text-white" />
@@ -773,21 +773,53 @@ function Converter() {
     const handleOpenAR = async () => {
         if (!modelObject) return;
         setLoading(true);
-        setUploadStatus("Generando AR (iOS/Android)...");
+        setUploadStatus("Iniciando motor AR...");
+
+        // Reset URLs
+        setArUrls({ usdz: null, glb: null });
+
         try {
+            console.log("AR: Iniciando generación de archivos...");
+
             // 1. Generate GLB (Android)
-            const glbBlob = await generateGLB();
-            const glbUrl = URL.createObjectURL(glbBlob);
+            let glbUrl = null;
+            try {
+                setUploadStatus("Generando para Android (GLB)...");
+                const glbBlob = await generateGLB();
+                glbUrl = URL.createObjectURL(glbBlob);
+                console.log("AR: GLB generado correctamente size=", glbBlob.size);
+            } catch (err) {
+                console.error("AR: Falló generación GLB", err);
+                toast({ title: "Advertencia", description: "No se pudo generar formato Android.", variant: "warning" });
+            }
 
             // 2. Generate USDZ (iOS)
-            const usdzBlob = await generateUSDZ();
-            const usdzUrl = URL.createObjectURL(usdzBlob);
+            let usdzUrl = null;
+            try {
+                setUploadStatus("Generando para iOS (USDZ)...");
+                const usdzBlob = await generateUSDZ();
+                usdzUrl = URL.createObjectURL(usdzBlob);
+                console.log("AR: USDZ generado correctamente size=", usdzBlob.size);
+            } catch (err) {
+                console.error("AR: Falló generación USDZ", err);
+                toast({ title: "Advertencia", description: "No se pudo generar formato iOS.", variant: "warning" });
+            }
+
+            if (!glbUrl && !usdzUrl) {
+                throw new Error("No se pudo generar ningún formato AR.");
+            }
 
             setArUrls({ glb: glbUrl, usdz: usdzUrl });
             setShowArDialog(true);
+            console.log("AR: Diálogo abierto");
+
         } catch (e) {
-            console.error(e);
-            toast({ title: "Error AR", description: "No se pudo generar los archivos AR.", variant: "destructive" });
+            console.error("AR SYSTEM ERROR:", e);
+            toast({
+                title: "Error AR",
+                description: `Fallo crítico: ${e.message}`,
+                variant: "destructive"
+            });
         } finally {
             setLoading(false);
             setUploadStatus("");
@@ -937,17 +969,42 @@ function Converter() {
     // View Utils
     const fitModelToView = (object) => {
         const box = new THREE.Box3().setFromObject(object);
+
+        if (box.isEmpty()) {
+            console.warn("Bounding Box is empty!");
+            toast({ title: "Advertencia", description: "El modelo parece estar vacío o no tiene geometría visible.", variant: "warning" });
+            return;
+        }
+
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
+
+        // Check for NaN or Infinity
+        if (isNaN(size.x) || !isFinite(size.x)) {
+            console.error("Invalid model bounds:", size);
+            return;
+        }
+
+        // Center model
         object.position.sub(center);
 
-        // Reset controls
-        if (controlsRef.current) {
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const dist = maxDim * 2;
+        if (controlsRef.current && cameraRef.current) {
+            const maxDim = Math.max(size.x, size.y, size.z) || 5; // Default to 5 if 0
+            const dist = maxDim * 2.5; // Slightly further back
+
+            // Adjust Clipping Planes for Giant/Micro models
+            cameraRef.current.near = maxDim / 1000;
+            cameraRef.current.far = maxDim * 100;
+            cameraRef.current.updateProjectionMatrix();
+
             cameraRef.current.position.set(dist, dist, dist);
+
             controlsRef.current.target.set(0, 0, 0);
+            controlsRef.current.maxDistance = maxDim * 10;
+            controlsRef.current.minDistance = maxDim / 50;
             controlsRef.current.update();
+
+            console.log("Comprobación de Cámara:", { maxDim, dist, near: cameraRef.current.near, far: cameraRef.current.far });
         }
     };
 
