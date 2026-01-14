@@ -785,97 +785,95 @@ function Converter() {
     const prepareModelForAR = async (originalModel) => {
         if (!originalModel) return null;
 
-        console.log("AR: Iniciando Optimización Robusta (v3.17.36)...");
+        console.log("AR: Iniciando Optimización de Memoria (v3.17.44)...");
         const arModel = originalModel.clone();
 
-        // 1. SANITIZE: Remove non-Mesh, non-Group objects (Lines, Points, Lights, Cameras)
+        // 1. SANITIZE: Remove non-Mesh objects
         const toRemove = [];
         arModel.traverse((child) => {
             if (child.isLine || child.isPoints || child.isLight || child.isCamera || child.isHelper) {
                 toRemove.push(child);
             }
-            // Ensure valid names for USDZ nodes
             if (!child.name) child.name = `node_${child.uuid.slice(0, 8)}`;
         });
         toRemove.forEach(child => {
             if (child.parent) child.parent.remove(child);
         });
 
-        // 2. NORMALIZE SCALE & POSITION (ADVANCED WRAPPER)
+        // 2. NORMALIZE
         const wrapper = new THREE.Group();
         wrapper.name = "AR_Wrapper";
-
-        // SYNC: Apply current web viewer transforms to the clone before wrapping
-        // This ensures the "Point Zero" (floor center) matches what the user see.
-        arModel.rotation.set(0, rotation, 0); // Apply current web rotation
+        arModel.rotation.set(0, rotation, 0);
         wrapper.add(arModel);
+        wrapper.updateMatrixWorld(true);
 
-        wrapper.updateMatrixWorld(true); // CRITICAL: Update before box calc
         const box = new THREE.Box3().setFromObject(arModel);
         if (!box.isEmpty()) {
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
-
-            console.log("AR: Dimensiones originales (+transform):", {
-                x: size.x.toFixed(2),
-                y: size.y.toFixed(2),
-                z: size.z.toFixed(2)
-            });
-
-            // Center the inner model relative to wrapper (0,0,0)
-            // We use current verticalPos as base, but for AR we want it on the floor (Y=0)
             arModel.position.set(-center.x, -box.min.y, -center.z);
 
-            // Scale logic: Target 0.8m - 1.0m
             const maxDim = Math.max(size.x, size.y, size.z);
             if (maxDim > 0) {
                 const targetSize = 0.8;
                 const scale = targetSize / maxDim;
-                console.log(`AR: Aplicando escala de ${scale.toFixed(4)} para ajustar a ${targetSize}m`);
-
                 arModel.scale.set(scale, scale, scale);
-                // Also adjust position since we scaled the child
                 arModel.position.multiplyScalar(scale);
             }
         }
-
-        // Final updates
         wrapper.updateMatrixWorld(true);
 
-        // 3. FLATTEN HIERARCHY & STANDARDIZE MATERIALS (AR REINFORCEMENT)
-        // QuickLook hates deep nesting and BasicMaterial.
+        // 3. ASYNC FLATTENING & GEOMETRY REUSE (CRITICAL FOR RAM)
         const flatGroup = new THREE.Group();
         flatGroup.name = "AR_Root";
 
-        wrapper.updateMatrixWorld(true);
-        const meshes = [];
+        const meshesToProcess = [];
         wrapper.traverse((child) => {
             if (child.isMesh && child.geometry) {
-                const clone = child.clone();
-                // Apply world matrix to geometry to flatten the hierarchy
-                clone.geometry = child.geometry.clone();
-                clone.geometry.applyMatrix4(child.matrixWorld);
-
-                // Use StandardMaterial (Apple's favorite) but as a "Watermark"
-                clone.material = new THREE.MeshStandardMaterial({
-                    color: child.material.color ? child.material.color.clone() : 0x888888,
-                    transparent: true,
-                    opacity: 0.5,
-                    metalness: 0,
-                    roughness: 1,
-                    side: THREE.DoubleSide
-                });
-
-                clone.position.set(0, 0, 0);
-                clone.rotation.set(0, 0, 0);
-                clone.scale.set(1, 1, 1);
-                meshes.push(clone);
+                meshesToProcess.push(child);
             }
         });
 
-        meshes.forEach(m => flatGroup.add(m));
+        const geometryCache = new Map();
+        const LOT_SIZE = 40; // Split work to let Safari breathe
 
-        console.log(`AR: Jerarquía aplanada (${meshes.length} mallas).`);
+        for (let i = 0; i < meshesToProcess.length; i++) {
+            const child = meshesToProcess[i];
+
+            // ASYNC YIELD: Every LOT_SIZE meshes, pause to prevent crash
+            if (i > 0 && i % LOT_SIZE === 0) {
+                setUploadStatus(`Procesando bloque ${Math.floor(i / LOT_SIZE) + 1}...`);
+                await new Promise(r => setTimeout(r, 20));
+            }
+
+            const clone = new THREE.Mesh();
+            clone.name = child.name;
+
+            // GEOMETRY REUSE: If multiple parts use same geometry, don't duplicate data
+            const geoId = child.geometry.uuid;
+            if (geometryCache.has(geoId)) {
+                clone.geometry = geometryCache.get(geoId);
+            } else {
+                const newGeo = child.geometry.clone();
+                newGeo.applyMatrix4(child.matrixWorld);
+                geometryCache.set(geoId, newGeo);
+                clone.geometry = newGeo;
+            }
+
+            clone.material = new THREE.MeshStandardMaterial({
+                color: child.material.color ? child.material.color.clone() : 0x888888,
+                transparent: true,
+                opacity: 0.5,
+                metalness: 0,
+                roughness: 1,
+                side: THREE.DoubleSide
+            });
+
+            flatGroup.add(clone);
+        }
+
+        console.log(`AR: Proceso completado. ${meshesToProcess.length} mallas aplanadas.`);
+        geometryCache.clear(); // Cleanup
         return flatGroup;
     };
 
@@ -943,7 +941,18 @@ function Converter() {
 
             setArUrls({ glb: glbUrl, usdz: usdzUrl });
             setShowArDialog(true);
-            console.log("AR: Diálogo abierto");
+
+            // CLEANUP: Dispose optimized model from memory as URLs already contain the data
+            if (optimizedModel) {
+                optimizedModel.traverse(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                        else child.material.dispose();
+                    }
+                });
+            }
+            console.log("AR: Diálogo abierto y memoria liberada.");
 
         } catch (e) {
             console.error("AR SYSTEM ERROR:", e);
