@@ -763,23 +763,71 @@ function Converter() {
     const [showArDialog, setShowArDialog] = useState(false);
     const [arUrls, setArUrls] = useState({ usdz: null, glb: null });
 
-    // Helper: Optimize Model for AR (Reduce Texture Size)
+    // Helper: Optimize Model for AR (Reduce Texture Size + Normalize Scale + Sanitize)
     const prepareModelForAR = async (originalModel) => {
         if (!originalModel) return null;
 
-        console.log("AR: Optimizando modelo...");
+        console.log("AR: Optimizando modelo (Geometría + Texturas)...");
         const arModel = originalModel.clone();
 
+        // 1. SANITIZE: Remove non-Mesh, non-Group objects (Lines, Points, Lights, Cameras)
+        const toRemove = [];
+        arModel.traverse((child) => {
+            if (child.isLine || child.isPoints || child.isLight || child.isCamera || child.isHelper) {
+                toRemove.push(child);
+            }
+        });
+        toRemove.forEach(child => {
+            if (child.parent) child.parent.remove(child);
+        });
+
+        // 2. NORMALIZE SCALE & POSITION
+        const box = new THREE.Box3().setFromObject(arModel);
+        if (!box.isEmpty()) {
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+
+            // Center at 0,0,0
+            arModel.position.x -= center.x;
+            arModel.position.y -= center.y;
+            arModel.position.z -= center.z;
+
+            // Scale to fit in ~1 meter cube (AR Friendly)
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0) {
+                const targetSize = 1.0; // 1 Meter
+                const scale = targetSize / maxDim;
+                arModel.scale.set(scale, scale, scale);
+                // Reset rotation
+                arModel.rotation.set(0, 0, 0);
+                arModel.updateMatrixWorld(true);
+            }
+        }
+
+        // 3. OPTIMIZE TEXTURES & MATERIALS
         // Use 1024 for AR (Sweet spot for mobile quality vs perf)
         const MAX_AR_TEXTURE_SIZE = 1024;
-
         const processedTextures = new Map();
 
         arModel.traverse((child) => {
             if (child.isMesh && child.material) {
                 const materials = Array.isArray(child.material) ? child.material : [child.material];
 
-                materials.forEach(mat => {
+                // Convert to Standard Material if complex (Physical, etc) to ensure compatibility
+                const newMaterials = materials.map(mat => {
+                    // Reduce transmission/clearcoat which kills usage on iOS
+                    if (mat.transmission > 0 || mat.clearcoat > 0) {
+                        mat.transmission = 0;
+                        mat.clearcoat = 0;
+                        mat.opacity = 0.9; // Flatten opacity issues
+                        mat.transparent = false; // Force Opaque if possible
+                    }
+                    return mat;
+                });
+
+                if (Array.isArray(child.material)) child.material = newMaterials;
+
+                newMaterials.forEach(mat => {
                     ['map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'normalMap', 'aoMap', 'alphaMap'].forEach(key => {
                         if (mat[key] && mat[key].image) {
                             // Check cache to avoid resizing same texture multiple times
