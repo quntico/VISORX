@@ -129,9 +129,12 @@ const DPad = ({ onMove }) => {
 };
 
 // ==================== CAPTURE TOOLBAR ====================
-const CaptureToolbar = ({ onScreenshot, onRecord, isRecording }) => {
+const CaptureToolbar = ({ onScreenshot, onRecord, isRecording, onHome }) => {
     return (
         <div className="absolute top-24 right-4 flex flex-col gap-3 z-50">
+            <Button size="icon" variant="secondary" className="rounded-full w-12 h-12 bg-black/60 border-white/20 text-white backdrop-blur-md" onClick={onHome} title="Centrar Modelo">
+                <Home className="w-5 h-5" />
+            </Button>
             <Button size="icon" variant="secondary" className="rounded-full w-12 h-12 bg-black/60 border-white/20 text-white backdrop-blur-md" onClick={onScreenshot}>
                 <Camera className="w-5 h-5" />
             </Button>
@@ -767,7 +770,7 @@ function Converter() {
     const prepareModelForAR = async (originalModel) => {
         if (!originalModel) return null;
 
-        console.log("AR: Iniciando Optimización Robusta (v3.17.35)...");
+        console.log("AR: Iniciando Optimización Robusta (v3.17.36)...");
         const arModel = originalModel.clone();
 
         // 1. SANITIZE: Remove non-Mesh, non-Group objects (Lines, Points, Lights, Cameras)
@@ -786,6 +789,10 @@ function Converter() {
         // 2. NORMALIZE SCALE & POSITION (ADVANCED WRAPPER)
         const wrapper = new THREE.Group();
         wrapper.name = "AR_Wrapper";
+
+        // SYNC: Apply current web viewer transforms to the clone before wrapping
+        // This ensures the "Point Zero" (floor center) matches what the user see.
+        arModel.rotation.set(0, rotation, 0); // Apply current web rotation
         wrapper.add(arModel);
 
         const box = new THREE.Box3().setFromObject(arModel);
@@ -793,14 +800,14 @@ function Converter() {
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
 
-            console.log("AR: Dimensiones originales:", {
+            console.log("AR: Dimensiones originales (+transform):", {
                 x: size.x.toFixed(2),
                 y: size.y.toFixed(2),
                 z: size.z.toFixed(2)
             });
 
             // Center the inner model relative to wrapper (0,0,0)
-            // Sit it on the floor (Y starts at 0)
+            // We use current verticalPos as base, but for AR we want it on the floor (Y=0)
             arModel.position.set(-center.x, -box.min.y, -center.z);
 
             // Scale logic: Target 0.8m - 1.0m
@@ -810,7 +817,6 @@ function Converter() {
                 const scale = targetSize / maxDim;
                 console.log(`AR: Aplicando escala de ${scale.toFixed(4)} para ajustar a ${targetSize}m`);
 
-                // CRITICAL: We apply scale to the MODEL, not the wrapper, for USDZ compatibility
                 arModel.scale.set(scale, scale, scale);
                 // Also adjust position since we scaled the child
                 arModel.position.multiplyScalar(scale);
@@ -1527,6 +1533,7 @@ function Converter() {
                         onScreenshot={handleScreenshot}
                         onRecord={handleRecord}
                         isRecording={isRecording}
+                        onHome={resetCamera}
                     />}
 
                     {/* React Overlay - ERROR STATE */}
