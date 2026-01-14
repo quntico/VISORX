@@ -105,23 +105,23 @@ const DPad = ({ onMove }) => {
         <div className="absolute bottom-32 left-8 w-32 h-32 touch-none lg:hidden z-50 grid grid-cols-3 grid-rows-3 gap-1 shadow-[0_0_20px_rgba(0,0,0,0.3)] bg-black/20 rounded-full p-1 transform rotate-45">
             <div className="transform -rotate-45" /> {/* Corner */}
             <div className={`${btnClass} transform -rotate-45`} onTouchStart={(e) => { e.preventDefault(); start({ z: -0.1 }) }} onTouchEnd={stop} onContextMenu={e => e.preventDefault()}>
-                <ArrowUp className="w-6 h-6 text-white" />
+                <span className="text-xl font-bold text-white">A</span>
             </div>
             <div className="transform -rotate-45" />
 
             <div className={`${btnClass} transform -rotate-45`} onTouchStart={(e) => { e.preventDefault(); start({ x: -0.1 }) }} onTouchEnd={stop} onContextMenu={e => e.preventDefault()}>
-                <ArrowLeft className="w-6 h-6 text-white" />
+                <span className="text-xl font-bold text-white">B</span>
             </div>
             <div className="flex items-center justify-center transform -rotate-45">
                 <div className="w-4 h-4 bg-white/30 rounded-full" />
             </div>
             <div className={`${btnClass} transform -rotate-45`} onTouchStart={(e) => { e.preventDefault(); start({ x: 0.1 }) }} onTouchEnd={stop} onContextMenu={e => e.preventDefault()}>
-                <ArrowRight className="w-6 h-6 text-white" />
+                <span className="text-xl font-bold text-white">C</span>
             </div>
 
             <div className="transform -rotate-45" />
             <div className={`${btnClass} transform -rotate-45`} onTouchStart={(e) => { e.preventDefault(); start({ z: 0.1 }) }} onTouchEnd={stop} onContextMenu={e => e.preventDefault()}>
-                <ArrowDown className="w-6 h-6 text-white" />
+                <span className="text-xl font-bold text-white">D</span>
             </div>
             <div className="transform -rotate-45" />
         </div>
@@ -767,7 +767,7 @@ function Converter() {
     const prepareModelForAR = async (originalModel) => {
         if (!originalModel) return null;
 
-        console.log("AR: Iniciando Optimización Robusta (v3.17.34)...");
+        console.log("AR: Iniciando Optimización Robusta (v3.17.35)...");
         const arModel = originalModel.clone();
 
         // 1. SANITIZE: Remove non-Mesh, non-Group objects (Lines, Points, Lights, Cameras)
@@ -829,14 +829,18 @@ function Converter() {
                 const materials = Array.isArray(child.material) ? child.material : [child.material];
 
                 materials.forEach(mat => {
-                    // SAFE MATERIALS FOR QUICK LOOK
+                    // SAFE MATERIALS FOR QUICK LOOK + VISIBILITY REINFORCEMENT
                     mat.side = THREE.DoubleSide; // Avoid invisibility from backface culling
+                    mat.shadowSide = THREE.DoubleSide;
+
+                    // Force opacity to be reliable
+                    if (mat.opacity < 0.1) mat.opacity = 1;
 
                     // Reduce transmission/clearcoat which kills usage on iOS
                     if (mat.transmission > 0 || mat.clearcoat > 0) {
                         mat.transmission = 0;
                         mat.clearcoat = 0;
-                        mat.opacity = Math.max(mat.opacity, 0.8);
+                        mat.opacity = Math.max(mat.opacity, 0.85);
                         mat.transparent = mat.opacity < 1;
                     }
 
