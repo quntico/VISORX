@@ -858,13 +858,19 @@ function Converter() {
                     // Force opacity to be reliable
                     if (mat.opacity < 0.1) mat.opacity = 1;
 
-                    // Reduce transmission/clearcoat which kills usage on iOS
-                    if (mat.transmission > 0 || mat.clearcoat > 0) {
-                        mat.transmission = 0;
-                        mat.clearcoat = 0;
-                        mat.opacity = Math.max(mat.opacity, 0.85);
-                        mat.transparent = mat.opacity < 1;
-                    }
+                    // Boost opacity for visibility
+                    mat.opacity = Math.max(mat.opacity, 0.9);
+                    mat.transparent = mat.opacity < 1;
+
+                    // Kill metallic/roughness if they might be causing issues on some iOS versions
+                    // mat.metalness = Math.min(mat.metalness, 0.5); 
+                    // mat.roughness = Math.max(mat.roughness, 0.2);
+
+                    // Reduce transmission/clearcoat/sheen which are problematic in USDZ
+                    if (mat.transmission !== undefined) mat.transmission = 0;
+                    if (mat.clearcoat !== undefined) mat.clearcoat = 0;
+                    if (mat.sheen !== undefined) mat.sheen = 0;
+                    if (mat.thickness !== undefined) mat.thickness = 0;
 
                     // Texture Resize Phase
                     ['map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'normalMap', 'aoMap', 'alphaMap'].forEach(key => {
